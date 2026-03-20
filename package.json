@@ -1,0 +1,13 @@
+{
+  "name": "memory-glyphs-groq-proxy",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "llm-proxy": "node server.mjs"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "groq-sdk": "^0.16.0"
+  }
+}

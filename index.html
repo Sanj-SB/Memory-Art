@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Memory Glyphs</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=Inter:wght@300;400&display=swap" rel="stylesheet"/>
+  <script src="https://cdn.jsdelivr.net/npm/p5@1.11.3/lib/p5.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/p5.brush@1.1.4/dist/p5.brush.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/universal-sentence-encoder@1.3.3/dist/universal-sentence-encoder.min.js"></script>
+  <script src="https://unpkg.com/ml5@1/dist/ml5.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+
+  <style>
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+    :root {
+      --bg:       #080d1f;
+      --text:     rgba(210, 220, 245, 0.85);
+      --dim:      rgba(150, 165, 210, 0.38);
+      --accent:   rgba(180, 160, 255, 0.7);
+      --glow:     rgba(160, 140, 255, 0.12);
+    }
+
+    body {
+      background: var(--bg);
+      overflow: hidden;
+      font-family: 'Inter', sans-serif;
+      color: var(--text);
+    }
+
+    #canvas-container { position:fixed; inset:0; z-index:0; }
+
+    #title {
+      position: fixed;
+      top: 28px; left: 32px;
+      z-index: 10;
+      pointer-events: none;
+    }
+    #title h1 {
+      font-family: 'Cormorant Garamond', serif;
+      font-weight: 300;
+      font-size: 13px;
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      color: var(--dim);
+    }
+    #title p {
+      margin-top: 5px;
+      font-size: 10px;
+      letter-spacing: 0.14em;
+      color: rgba(150,165,210,0.25);
+      max-width: 240px;
+      line-height: 1.7;
+    }
+
+    #inputArea {
+      position: fixed;
+      bottom: 40px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      width: 480px;
+      max-width: 90vw;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+    }
+
+    #memInput {
+      width: 100%;
+      background: transparent;
+      border: none;
+      border-bottom: 1px solid rgba(200, 210, 255, 0.1);
+      color: var(--text);
+      font-family: 'Cormorant Garamond', serif;
+      font-style: italic;
+      font-weight: 300;
+      font-size: 18px;
+      letter-spacing: 0.06em;
+      padding: 8px 0;
+      outline: none;
+      text-align: center;
+      caret-color: var(--accent);
+      transition: border-color 0.4s, box-shadow 0.4s;
+    }
+    #memInput::placeholder {
+      color: rgba(180, 190, 230, 0.28);
+      font-style: italic;
+    }
+    #memInput:focus {
+      border-bottom-color: rgba(180, 160, 255, 0.35);
+      box-shadow: 0 4px 24px var(--glow);
+    }
+
+    #hint {
+      font-size: 9px;
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      color: var(--dim);
+      opacity: 0.6;
+      text-align: center;
+    }
+
+    #utils {
+      position: fixed;
+      bottom: 28px; right: 28px;
+      z-index: 10;
+      display: flex;
+      gap: 20px;
+    }
+    .util-btn {
+      background: none; border: none; cursor: pointer;
+      font-family: 'Inter', sans-serif;
+      font-size: 9px; letter-spacing: 0.22em;
+      text-transform: lowercase;
+      color: rgba(150,165,210,0.22);
+      padding: 4px 0;
+      transition: color 0.25s;
+    }
+    .util-btn:hover { color: rgba(200,210,245,0.65); }
+
+    #status {
+      position: fixed;
+      bottom: 28px; left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      font-size: 9px; letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--dim);
+      opacity: 0.4;
+      pointer-events: none;
+      transition: opacity 0.5s;
+      white-space: nowrap;
+    }
+
+    #memLabel {
+      position: fixed;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 20;
+      display: none;
+      font-family: 'Cormorant Garamond', serif;
+      font-style: italic;
+      font-weight: 300;
+      font-size: clamp(18px, 2.5vw, 28px);
+      letter-spacing: 0.08em;
+      color: rgba(225, 230, 255, 0.92);
+      text-align: center;
+      max-width: 60vw;
+      line-height: 1.6;
+      pointer-events: none;
+      transition: opacity 0.6s;
+    }
+    .merge-badge {
+      display: block; margin-top: 10px;
+      font-family: 'Inter', sans-serif; font-style: normal;
+      font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase;
+      color: rgba(200, 180, 255, 0.45);
+    }
+    .sim-badge {
+      display: block; margin-top: 6px;
+      font-family: 'Inter', sans-serif; font-style: normal;
+      font-size: 9px; letter-spacing: 0.14em;
+      color: rgba(150, 220, 180, 0.45);
+    }
+
+    #loadingOverlay {
+      position: fixed; inset: 0; z-index: 50;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 16px;
+      background: var(--bg); transition: opacity 0.8s;
+    }
+    #loadingOverlay.hidden { opacity: 0; pointer-events: none; }
+    #loadingOverlay span {
+      font-family: 'Cormorant Garamond', serif; font-style: italic;
+      font-size: 14px; letter-spacing: 0.2em; color: rgba(160,170,220,0.5);
+    }
+    #loadingOverlay small {
+      font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase;
+      color: rgba(130,145,200,0.3);
+    }
+
+    .flow-btn {
+      background: transparent;
+      border: 1px solid rgba(180, 160, 255, 0.4);
+      color: rgba(210, 220, 245, 0.9);
+      font-family: 'Inter', sans-serif;
+      font-size: 10px; letter-spacing: 0.28em; text-transform: lowercase;
+      padding: 10px 28px; cursor: pointer;
+      transition: border-color 0.3s, color 0.3s, box-shadow 0.3s;
+    }
+    .flow-btn:hover { border-color: rgba(180, 160, 255, 0.7); box-shadow: 0 0 20px var(--glow); }
+    .flow-btn-muted { border-color: rgba(150, 165, 210, 0.25); color: rgba(150, 165, 210, 0.6); }
+    .flow-btn-muted:hover { border-color: rgba(150, 165, 210, 0.45); }
+
+    .flow-actions { position:fixed; bottom:80px; left:50%; transform:translateX(-50%); z-index:12; display:flex; gap:24px; }
+
+    /* Mode switcher: top-right, above timeline (z-index 24 > timeline 18) */
+    .mode-switcher {
+      position: fixed;
+      top: 28px; right: 28px;
+      z-index: 24;
+      display: flex;
+      gap: 12px;
+      pointer-events: auto;
+    }
+
+    .mode-btn {
+      background: transparent;
+      border: none;
+      color: rgba(150, 165, 210, 0.35);
+      font-family: 'Inter', sans-serif;
+      font-size: 9px; letter-spacing: 0.2em; text-transform: lowercase;
+      padding: 4px 8px; cursor: pointer;
+      transition: color 0.25s;
+    }
+    .mode-btn:hover, .mode-btn.active { color: rgba(200, 210, 255, 0.85); }
+
+    #authDrawCanvas { display:block; width:100%; height:100%; cursor:crosshair; }
+    .auth-instructions {
+      position:absolute; top:40px; left:50%; transform:translateX(-50%);
+      text-align:center; pointer-events:none; z-index:1;
+      font-size:11px; letter-spacing:0.12em; color:rgba(200,215,255,0.8);
+      max-width:400px; line-height:1.7;
+    }
+    .auth-instructions strong { color:rgba(230,220,255,0.95); }
+    .auth-error { position:absolute; bottom:120px; left:50%; transform:translateX(-50%); color:#f88; font-size:11px; }
+
+    #gestureTutorial { display:flex; pointer-events:auto; }
+    .gesture-title { font-size:14px; letter-spacing:0.2em; text-transform:uppercase; color:var(--dim); }
+    .gesture-desc { font-size:11px; color:rgba(150,165,210,0.7); text-align:center; max-width:320px; }
+
+    #handVideo { position:fixed; bottom:90px; left:24px; width:120px; height:90px; object-fit:cover; border-radius:4px; border:1px solid rgba(150,165,210,0.2); z-index:14; }
+
+    .mem-label-el {
+      position: fixed; pointer-events: none;
+      font-family: 'Inter', sans-serif; font-size: 8px;
+      letter-spacing: 0.18em; text-transform: uppercase;
+      color: rgba(200,215,245,0.45);
+      transform: translate(-50%, 0);
+      transition: opacity 0.8s;
+      white-space: nowrap;
+    }
+
+    /* Timeline side panel — padding-top avoids overlapping mode buttons */
+    #timelinePanel {
+      position: fixed;
+      top: 0; right: 0;
+      width: 320px; max-width: 40vw;
+      height: 100vh;
+      z-index: 18;
+      background: linear-gradient(135deg, rgba(12,16,38,0.96) 0%, rgba(8,13,31,0.98) 100%);
+      border-left: 1px solid rgba(140,120,220,0.12);
+      padding: 60px 28px 28px;
+      overflow-y: auto;
+      transform: translateX(100%);
+      transition: transform 0.55s cubic-bezier(0.4, 0, 0.2, 1);
+      pointer-events: auto;
+      display: flex; flex-direction: column; gap: 0;
+    }
+    #timelinePanel.open { transform: translateX(0); }
+    #timelinePanel::-webkit-scrollbar { width: 3px; }
+    #timelinePanel::-webkit-scrollbar-track { background: transparent; }
+    #timelinePanel::-webkit-scrollbar-thumb { background: rgba(140,120,220,0.2); border-radius: 2px; }
+
+    .tl-header {
+      font-family: 'Inter', sans-serif; font-size: 9px;
+      letter-spacing: 0.28em; text-transform: uppercase;
+      color: rgba(160,150,210,0.6); margin-bottom: 8px;
+    }
+    .tl-original {
+      font-family: 'Cormorant Garamond', serif; font-style: italic;
+      font-size: 16px; color: rgba(220,225,250,0.85);
+      line-height: 1.6; margin-bottom: 28px; padding-bottom: 20px;
+      border-bottom: 1px solid rgba(140,120,220,0.1);
+    }
+    .tl-entries { display:flex; flex-direction:column; gap:0; }
+    .tl-entry {
+      position: relative; padding: 14px 0 14px 24px;
+      border-left: 1px solid rgba(140,120,220,0.12);
+    }
+    .tl-entry::before {
+      content: ''; position: absolute;
+      left: -4px; top: 18px;
+      width: 7px; height: 7px; border-radius: 50%;
+      background: rgba(140,120,220,0.35);
+      box-shadow: 0 0 8px rgba(140,120,220,0.25);
+    }
+    .tl-entry:first-child::before {
+      background: rgba(180,160,255,0.6);
+      box-shadow: 0 0 12px rgba(180,160,255,0.3);
+    }
+    .tl-entry-label {
+      font-family: 'Inter', sans-serif; font-size: 8px;
+      letter-spacing: 0.2em; text-transform: uppercase;
+      color: rgba(150,140,200,0.5); margin-bottom: 5px;
+    }
+    .tl-entry-text {
+      font-family: 'Cormorant Garamond', serif; font-style: italic;
+      font-size: 14px; color: rgba(210,215,240,0.75); line-height: 1.55;
+    }
+    .tl-entry-sim {
+      margin-top: 4px; font-family: 'Inter', sans-serif;
+      font-size: 8px; letter-spacing: 0.14em; color: rgba(150,200,180,0.4);
+    }
+    .tl-entry-merge-meta {
+      margin-top: 6px; font-family: 'Inter', sans-serif;
+      font-size: 9px; letter-spacing: 0.12em; color: rgba(160,150,210,0.6);
+    }
+    .tl-empty {
+      font-family: 'Inter', sans-serif; font-size: 10px;
+      letter-spacing: 0.14em; color: rgba(150,165,210,0.35); margin-top: 12px;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="loadingOverlay">
+    <span>memory glyphs</span>
+    <small>preparing semantic model…</small>
+  </div>
+
+  <div id="title">
+    <h1>Memory Glyphs</h1>
+    <p>your memories, encoded. add two or more — watch them find each other.</p>
+  </div>
+
+  <div id="inputArea">
+    <input id="memInput" type="text" maxlength="140"
+           placeholder="what do you remember?"
+           autocomplete="off" spellcheck="false"/>
+    <div id="hint">enter to add &nbsp;·&nbsp; drag to explore</div>
+    <button class="flow-btn flow-btn-muted" id="skipToVoidBtn" style="display:none; margin-top:4px; font-size:9px; padding:6px 20px;">enter the void</button>
+  </div>
+
+  <div id="voidEnter" style="display:none; position:fixed; bottom:80px; left:50%; transform:translateX(-50%); z-index:12; gap:18px;">
+    <button class="flow-btn" id="loginBtn">login</button>
+    <button class="flow-btn flow-btn-muted" id="signupBtn">sign up</button>
+  </div>
+
+  <div id="loginOverlay" style="display:none; position:fixed; inset:0; z-index:15; background:rgba(8,13,31,0.95); pointer-events:auto; flex-direction:column; align-items:center; justify-content:center; gap:16px;">
+    <p style="font-size:16px; color:rgba(200,215,255,0.9); font-style:italic; margin-bottom:8px;" id="loginTitle">login</p>
+    <input id="authUsername" type="text" placeholder="choose a username" autocomplete="username"
+      style="width:280px; background:transparent; border:0; border-bottom:1px solid rgba(255,255,255,0.15); padding:10px 4px; color:rgba(210,220,245,0.9); font-family:'Cormorant Garamond',serif; font-size:18px; outline:none;"/>
+    <input id="authPassword" type="password" placeholder="password" autocomplete="current-password"
+      style="width:280px; background:transparent; border:0; border-bottom:1px solid rgba(255,255,255,0.15); padding:10px 4px; color:rgba(210,220,245,0.9); font-family:'Cormorant Garamond',serif; font-size:18px; outline:none;"/>
+    <div id="authError" class="auth-error" style="display:none; color:rgba(255,140,140,0.9); font-size:11px; letter-spacing:0.1em;"></div>
+    <div style="display:flex; gap:16px; margin-top:8px;">
+      <button class="flow-btn" id="authSubmitBtn">enter</button>
+      <button class="flow-btn flow-btn-muted" id="authBackBtn">back</button>
+    </div>
+  </div>
+
+  <div id="symbolOverlay" style="display:none; position:fixed; inset:0; z-index:15; pointer-events:auto;">
+    <canvas id="authDrawCanvas"></canvas>
+    <div class="auth-instructions">
+      <p>Draw your identity symbol.</p>
+      <p>This will mark all your memories in the void.</p>
+      <p>Use a shape or pattern — no letters. Draw at least 2 strokes.</p>
+    </div>
+    <div id="symbolError" class="auth-error" style="display:none;"></div>
+  </div>
+  <div id="symbolDone" class="flow-actions" style="display:none; position:fixed; bottom:80px; left:50%; transform:translateX(-50%); z-index:16;">
+    <button class="flow-btn" id="symbolClearBtn">clear</button>
+    <button class="flow-btn" id="symbolDoneBtn">done</button>
+  </div>
+
+  <div id="previewActions" class="flow-actions" style="display:none; z-index:100; pointer-events:auto;">
+    <button class="flow-btn" type="button" id="stampBtn">stamp</button>
+    <button class="flow-btn flow-btn-muted" type="button" id="anonStampBtn">anonymous</button>
+    <button class="flow-btn flow-btn-muted" type="button" id="cancelPreviewBtn">cancel</button>
+  </div>
+
+  <div id="focusNav" class="flow-actions" style="display:none; z-index:100; pointer-events:auto; bottom:140px;">
+    <button class="flow-btn flow-btn-muted" type="button" id="focusPrev">← prev</button>
+    <button class="flow-btn flow-btn-muted" type="button" id="focusNext">next →</button>
+  </div>
+
+  <div id="gestureTutorial" style="display:none; position:fixed; inset:0; z-index:25; background:rgba(8,13,31,0.92); flex-direction:column; align-items:center; justify-content:center; gap:20px;">
+    <p class="gesture-title">hand gestures</p>
+    <p class="gesture-desc">Open palm → collective · Peace sign → recall · Fist → raw</p>
+    <button class="flow-btn" id="enableGesturesBtn">enable camera</button>
+    <button class="flow-btn flow-btn-muted" id="skipGesturesBtn">skip</button>
+  </div>
+
+  <!-- Mode switcher: top-right, always above timeline -->
+  <div id="modeSwitcher" class="mode-switcher" style="display:none;">
+    <button class="mode-btn" id="gesturesToggleBtn" title="hand gestures">gestures</button>
+    <button class="mode-btn" data-mode="raw">raw</button>
+    <button class="mode-btn" data-mode="recall">recall</button>
+    <button class="mode-btn" data-mode="collective">collective</button>
+  </div>
+
+  <div id="finalActions" class="flow-actions" style="display:none;">
+    <button class="flow-btn" id="stampFinalBtn">stamp to void</button>
+    <button class="flow-btn flow-btn-muted" id="releaseFinalBtn">release</button>
+  </div>
+
+  <div id="utils">
+    <button class="util-btn" id="toFinalBtn" style="display:none;">to final</button>
+    <button class="util-btn" id="reshuffleBtn">reshuffle</button>
+    <button class="util-btn" id="saveBtn">save</button>
+  </div>
+
+  <div id="memLabel"></div>
+
+  <div id="status">loading…</div>
+  <div id="llmStatus" style="position:fixed; top:28px; left:50%; transform:translateX(-50%); z-index:10; font-family:'Inter',sans-serif; font-size:8px; letter-spacing:0.2em; text-transform:uppercase; color:rgba(150,165,210,0.3); pointer-events:none;"></div>
+
+  <video id="handVideo" style="display:none;" playsinline muted></video>
+  <div id="gestureDebug" style="display:none; position:fixed; bottom:190px; left:24px; z-index:20; font-family:'Inter',sans-serif; font-size:10px; letter-spacing:0.1em; color:rgba(200,220,255,0.9); background:rgba(0,0,0,0.5); padding:6px 12px; border-radius:4px; pointer-events:none;"></div>
+
+  <div id="timelinePanel">
+    <div class="tl-header">memory timeline</div>
+    <div class="tl-original" id="tlOriginal"></div>
+    <div class="tl-entries" id="tlEntries"></div>
+  </div>
+
+  <div id="canvas-container"></div>
+
+  <script>
+    let _overlayHidden = false;
+    function hideOverlay() {
+      if (_overlayHidden) return; _overlayHidden = true;
+      const ov = document.getElementById('loadingOverlay');
+      ov.classList.add('hidden');
+      setTimeout(()=>ov.style.display='none', 900);
+    }
+    const _poll = setInterval(()=>{
+      if (typeof modelReady !== 'undefined' && modelReady) { hideOverlay(); clearInterval(_poll); }
+    }, 300);
+    setTimeout(hideOverlay, 14000);
+  </script>
+
+  <!-- Load order: globals first, then modules, sketch last -->
+  <script src="globals.js"></script>
+  <script src="supabase.js"></script>
+  <script src="llm.js"></script>
+  <script src="gestures.js"></script>
+  <script src="timeline.js"></script>
+  <script src="memory.js"></script>
+  <script src="glyphs.js"></script>
+  <script src="rendering.js"></script>
+  <script src="screens.js"></script>
+  <script src="physics.js"></script>
+  <script src="ui.js"></script>
+  <script src="interaction.js"></script>
+  <script src="sketch.js"></script>
+</body>
+</html>

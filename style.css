@@ -1,0 +1,134 @@
+*, *::before, *::after{ box-sizing:border-box; }
+
+:root{
+  --bg: #080d1f;
+  --ink: rgba(245,246,255,0.88);
+  --muted: rgba(245,246,255,0.50);
+  --hair: rgba(255,255,255,0.10);
+  --glow: rgba(180,160,255,0.15);
+}
+
+html, body{ margin:0; padding:0; height:100%; }
+body{
+  overflow:hidden;
+  background:
+    radial-gradient(1200px 900px at 20% 10%, rgba(180,160,255,0.08), transparent 55%),
+    radial-gradient(900px 700px at 75% 25%, rgba(120,180,255,0.06), transparent 60%),
+    radial-gradient(900px 900px at 55% 90%, rgba(255,220,160,0.04), transparent 62%),
+    var(--bg);
+  color:var(--ink);
+  font-family:"Cormorant Garamond", serif;
+}
+
+canvas{ display:block; }
+#canvas-container{ position:fixed; inset:0; z-index:0; }
+
+#overlay{ position:fixed; inset:0; z-index:10; pointer-events:none; }
+#memFloatLayer{ position:absolute; inset:0; pointer-events:none; }
+
+.mem-float{
+  position:absolute;
+  left:0; top:0;
+  transform: translate(-50%,-50%);
+  max-width: min(420px, 55vw);
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  color:rgba(245,246,255,0.70);
+  font-family:"Inter", system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font-size:11px;
+  letter-spacing:0.08em;
+  text-transform:uppercase;
+  opacity:0.0;
+  transition: opacity .25s linear;
+  text-shadow: 0 0 10px rgba(180,160,255,0.08);
+}
+
+/* Center revealed label */
+#memLabel{
+  position:absolute;
+  left:50%; top:46%;
+  transform:translate(-50%,-50%);
+  display:none;
+  max-width:min(860px, calc(100vw - 28px));
+  text-align:center;
+  pointer-events:none;
+  color:rgba(245,246,255,0.92);
+  font-family:"Cormorant Garamond", serif;
+  font-style:italic;
+  font-size: clamp(26px, 3.2vw, 44px);
+  line-height:1.15;
+  letter-spacing:0.02em;
+  opacity:0;
+  transition: opacity .35s linear;
+}
+
+/* Composer (bottom centered) */
+#composer{
+  position:absolute;
+  left:50%;
+  bottom:28px;
+  transform:translateX(-50%);
+  width:min(720px, calc(100vw - 36px));
+  pointer-events:auto;
+}
+
+#memInput{
+  width:100%;
+  background:transparent;
+  border:0;
+  border-bottom:1px solid var(--hair);
+  padding:12px 2px 10px 2px;
+  outline:none;
+  color:rgba(245,246,255,0.88);
+  font-family:"Cormorant Garamond", serif;
+  font-style:italic;
+  font-size:22px;
+  letter-spacing:0.01em;
+}
+#memInput::placeholder{
+  color:rgba(245,246,255,0.38);
+  font-style:italic;
+}
+#memInput:focus{
+  box-shadow: 0 0 20px var(--glow);
+  border-bottom-color: rgba(245,246,255,0.18);
+}
+
+#hint{
+  margin-top:10px;
+  text-align:center;
+  font-family:"Inter", system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font-size:10px;
+  letter-spacing:0.22em;
+  text-transform:uppercase;
+  color:rgba(245,246,255,0.40);
+}
+
+/* Tiny actions bottom-right */
+#actions{
+  position:absolute;
+  right:18px;
+  bottom:18px;
+  display:flex;
+  gap:14px;
+  pointer-events:auto;
+}
+.action{
+  background:transparent;
+  border:0;
+  padding:0;
+  cursor:pointer;
+  font-family:"Inter", system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font-size:11px;
+  letter-spacing:0.10em;
+  text-transform:lowercase;
+  color:rgba(245,246,255,0.22);
+  transition: color .15s linear;
+}
+.action:hover{ color:rgba(245,246,255,0.70); }
+
+@media (max-width: 640px){
+  #memInput{ font-size:20px; }
+  .mem-float{ max-width: 62vw; }
+}
