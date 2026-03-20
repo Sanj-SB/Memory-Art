@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "llm-proxy": "node server.mjs"
+    "llm-proxy": "node local-llm-proxy.mjs",
+    "dev:site": "npx --yes serve public -l 3000"
   },
   "dependencies": {
     "cors": "^2.8.5",
