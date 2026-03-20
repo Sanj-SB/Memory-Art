@@ -1,14 +1,29 @@
-// LLM integration via local Groq proxy + local fallback merge.
+// LLM integration: Vercel uses same-origin /api/callApi; local dev uses npm run llm-proxy on :3001.
 
+const LLM_API_PATH = '/api/callApi';
 const LLM_PROXY_URL = 'http://localhost:3001';
 const LLM_MODEL = 'moonshotai/kimi-k2-instruct-0905';
 let llmAvailable = false;
 
+function isLocalDev() {
+  const h = typeof location !== 'undefined' ? location.hostname : '';
+  return h === 'localhost' || h === '127.0.0.1' || h === '';
+}
+
+function llmHealthUrl() {
+  return isLocalDev() ? `${LLM_PROXY_URL}/api/llm/health` : LLM_API_PATH;
+}
+
+function llmChatUrl() {
+  return isLocalDev() ? `${LLM_PROXY_URL}/api/llm/chat` : LLM_API_PATH;
+}
+
 async function checkLLM() {
-  console.log(`[DEBUG:LLM] Checking LLM health at ${LLM_PROXY_URL}/api/llm/health`);
+  const healthUrl = llmHealthUrl();
+  console.log(`[DEBUG:LLM] Checking LLM health at ${healthUrl}`);
   const indicator = document.getElementById('llmStatus');
   try {
-    const res = await fetch(`${LLM_PROXY_URL}/api/llm/health`, { signal: AbortSignal.timeout(2000) });
+    const res = await fetch(healthUrl, { signal: AbortSignal.timeout(2000) });
     if (!res.ok) throw new Error('health check failed');
     const data = await res.json();
     llmAvailable = !!data.ok;
@@ -25,7 +40,7 @@ async function llmGenerate(prompt, maxTokens) {
   if (!llmAvailable) return null;
   console.log(`[DEBUG:LLM] llmGenerate (maxTokens=${maxTokens || 160})`);
   try {
-    const res = await fetch(`${LLM_PROXY_URL}/api/llm/chat`, {
+    const res = await fetch(llmChatUrl(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ prompt, max_tokens: maxTokens || 160, temperature: 0.6 }),
