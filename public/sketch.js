@@ -11,7 +11,9 @@ function preload() {
 }
 
 function setup() {
+  if (typeof setAttributes === 'function') setAttributes({ alpha: true });
   createCanvas(windowWidth, windowHeight, WEBGL).parent('canvas-container');
+  ambientLight(85, 92, 125);
   if (glyphFont) textFont(glyphFont);
   brush.load();
   initGlyphGraph();
@@ -150,8 +152,22 @@ function setup() {
   });
   const focusPrev = document.getElementById('focusPrev');
   const focusNext = document.getElementById('focusNext');
-  if (focusPrev) focusPrev.addEventListener('click', () => { rawFocusIdx = nextOwnedMemory(-1); populateTimeline(); });
-  if (focusNext) focusNext.addEventListener('click', () => { rawFocusIdx = nextOwnedMemory(1); populateTimeline(); });
+  if (focusPrev) focusPrev.addEventListener('click', () => {
+    rawFocusIdx = nextOwnedMemory(-1);
+    if (interactionMode === INTERACTION_MODE.RECALL && memories[rawFocusIdx]) {
+      memories[rawFocusIdx]._recallApplied = false;
+      memories[rawFocusIdx]._recallLoading = false;
+    }
+    populateTimeline();
+  });
+  if (focusNext) focusNext.addEventListener('click', () => {
+    rawFocusIdx = nextOwnedMemory(1);
+    if (interactionMode === INTERACTION_MODE.RECALL && memories[rawFocusIdx]) {
+      memories[rawFocusIdx]._recallApplied = false;
+      memories[rawFocusIdx]._recallLoading = false;
+    }
+    populateTimeline();
+  });
   const stampFinalBtn = document.getElementById('stampFinalBtn');
   if (stampFinalBtn) stampFinalBtn.addEventListener('click', doStampFinal);
   const releaseFinalBtn = document.getElementById('releaseFinalBtn');
@@ -184,15 +200,18 @@ function draw() {
 
   // INTERACT
   if (mode === 'idle') {
-    background(10, 20, 50); noStroke(); fill(60, 90, 180, 30);
-    for (let i = 4; i >= 0; i--) ellipse(0, 0, 80 + i * 48, 80 + i * 48);
+    drawSpaceBackground();
+    push();
+    camera();
+    ortho(-width / 2, width / 2, height / 2, -height / 2, -10, 10);
     stroke(100, 140, 255, 45); strokeWeight(0.5);
     line(-80, 0, 80, 0); line(0, -80, 0, 80); noStroke();
+    pop();
     updateFlowUI(); return;
   }
 
   if (mode === 'display') {
-    background(10, 20, 50);
+    drawSpaceBackground();
     const t = frameCount * 0.008;
     const R = getSphereR();
 
@@ -212,8 +231,8 @@ function draw() {
     if (interactionMode === INTERACTION_MODE.RAW && rawFocusIdx >= 0 && rawFocusIdx < memories.length && isMyMemory(memories[rawFocusIdx])) {
       hideAllMemoryLabels();
       camera(0, 0, (height / 2 / tan(PI / 6)) + camZ, 0, 0, 0, 0, 1, 0);
-      if (!isDragging) rotY += 0.002;
-      curRotX = lerp(curRotX, rotX, 0.06); curRotY = lerp(curRotY, rotY, 0.06);
+      if (!isDragging) rotY += 0.0032;
+      curRotX = lerp(curRotX, rotX, CAM_ROT_LERP); curRotY = lerp(curRotY, rotY, CAM_ROT_LERP);
       const mem = memories[rawFocusIdx];
       if (!mem._rawSnapshot) {
         const savedSentence = mem.sentence, savedNodes = mem.nodes, savedGlyphs = mem.glyphs;
@@ -221,7 +240,9 @@ function draw() {
         mem._rawSnapshot = { nodes: mem.nodes, glyphs: mem.glyphs };
         mem.sentence = savedSentence; mem.nodes = savedNodes; mem.glyphs = savedGlyphs;
       }
-      push(); rotateX(curRotX); rotateY(curRotY); drawMemSphere(R, mem);
+      push(); rotateX(curRotX); rotateY(curRotY);
+      drawMemSphere(R, mem);
+      drawStampSatellite(R, mem);
       const spin = t * 0.15;
       push(); rotateY(spin); rotateX(spin * 0.6);
       fill(255, 255, 255, 255 * mem.vitality);
@@ -239,24 +260,39 @@ function draw() {
     else if (interactionMode === INTERACTION_MODE.RECALL && rawFocusIdx >= 0 && rawFocusIdx < memories.length && isMyMemory(memories[rawFocusIdx])) {
       hideAllMemoryLabels();
       camera(0, 0, (height / 2 / tan(PI / 6)) + camZ, 0, 0, 0, 0, 1, 0);
-      if (!isDragging) rotY += 0.002;
-      curRotX = lerp(curRotX, rotX, 0.06); curRotY = lerp(curRotY, rotY, 0.06);
+      if (!isDragging) rotY += 0.0032;
+      curRotX = lerp(curRotX, rotX, CAM_ROT_LERP); curRotY = lerp(curRotY, rotY, CAM_ROT_LERP);
       const mem = memories[rawFocusIdx];
       if (!mem._recallApplied && !mem._recallLoading) {
-        console.log(`[DEBUG:RECALL] Initiating recall for #${rawFocusIdx}`);
+        const sourceText = (mem.sentence || mem.originalSentence || '').trim();
+        const chainFromPrior =
+          typeof normalizeMemoryText === 'function' &&
+          normalizeMemoryText(sourceText) !== normalizeMemoryText(mem.originalSentence);
+        console.log(`[DEBUG:RECALL] Initiating recall for #${rawFocusIdx} (from ${chainFromPrior ? 'current' : 'original'} text)`);
         mem._recallLoading = true;
-        applyRecallTransform(mem.originalSentence).then(result => {
-          const txt = result || mem.originalSentence;
-          mem._recallSentence = txt; mem.sentence = txt;
-          mem._recallApplied = true; mem._recallLoading = false;
-          console.log(`[DEBUG:RECALL] Transform: "${mem.originalSentence}" → "${txt}"`);
+        applyRecallTransform(sourceText, { chainFromPrior }).then(result => {
+          const txt = result || sourceText;
+          mem._recallSentence = txt;
+          mem.sentence = txt;
+          mem._recallApplied = true;
+          mem._recallLoading = false;
+          console.log(`[DEBUG:RECALL] Transform: "${sourceText}" → "${txt}"`);
           if (mem.timeline) {
-            mem.timeline.push({ type: 'recall', text: txt, prev: mem.originalSentence, time: Date.now() });
+            mem.timeline.push({ type: 'recall', text: txt, prev: sourceText, time: Date.now() });
           }
-          rebuildNodes(rawFocusIdx); populateTimeline();
+          rebuildNodes(rawFocusIdx);
+          populateTimeline();
+          updateMemoryList();
+        }).catch(() => {
+          mem._recallLoading = false;
+          mem._recallApplied = true;
+          mem.sentence = sourceText;
+          rebuildNodes(rawFocusIdx);
         });
       }
-      push(); rotateX(curRotX); rotateY(curRotY); drawMemSphere(R, mem);
+      push(); rotateX(curRotX); rotateY(curRotY);
+      drawMemSphere(R, mem);
+      drawStampSatellite(R, mem);
       const spin = t * 0.15;
       push(); rotateY(spin); rotateX(spin * 0.6);
       fill(255, 255, 255, 255 * mem.vitality);
@@ -272,8 +308,8 @@ function draw() {
     }
     // FLOAT / COLLECTIVE
     else {
-      if (!isDragging) rotY += 0.003;
-      curRotX = lerp(curRotX, rotX, 0.06); curRotY = lerp(curRotY, rotY, 0.06);
+      if (!isDragging) rotY += 0.0048;
+      curRotX = lerp(curRotX, rotX, CAM_ROT_LERP); curRotY = lerp(curRotY, rotY, CAM_ROT_LERP);
       camera(-width * 0.6, 0, (height / 2 / tan(PI / 6)) + camZ, 0, 0, 0, 0, 1, 0);
       applyGravity(R);
       const drift = R * 0.18;
@@ -301,6 +337,7 @@ function draw() {
         if (distAlpha <= 0) { pop(); return; }
         const spin = t * (0.13 + mi * 0.025);
         drawMemSphere(R, mem);
+        drawStampSatellite(R, mem, distAlpha);
         push(); rotateY(spin); rotateX(spin * 0.6);
         fill(255, 255, 255, 255 * mem.vitality * distAlpha);
         mem.nodes.forEach(nd => drawGlyph3D(nd, mem.glyphs, mem, mem.vitality * distAlpha));

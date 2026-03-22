@@ -44,11 +44,16 @@ const COOL_FRAMES = 180;
 const MAX_RENDER_DISTANCE = 1100;
 const FADE_START_DISTANCE = 900;
 const ENABLE_DISTANCE_CULL = true;
-const GLYPH_SPARKLE_STRENGTH = 0.4;
+const GLYPH_SPARKLE_STRENGTH = 0.28;
 
-const GRAVITY_K = 0.025;
-const DAMPING = 0.995;
-const SPRING_K = 0.003;
+const SPHERE_LISSAJOUS_SEGS = 36;
+
+const GRAVITY_K = 0.028;
+const DAMPING = 0.998;
+const SPRING_K = 0.0065;
+
+const MAX_GLYPH_UNITS = 10;
+const CAM_ROT_LERP = 0.14;
 
 let useModel = null;
 let modelReady = false;
@@ -136,8 +141,29 @@ function gauss01(rng) {
   return sqrt(-2 * log(u)) * cos(TWO_PI * v);
 }
 
+let _statusText = '';
+let _statusFadeTimer = null;
+
 function setStatus(msg) {
   const el = select('#status'); if (!el) return;
-  el.elt.textContent = msg; el.elt.style.opacity = '0.8';
-  setTimeout(() => el.elt.style.opacity = '0.35', 5000);
+  const next = String(msg ?? '');
+  if (next === _statusText) return;
+  _statusText = next;
+  if (_statusFadeTimer) {
+    clearTimeout(_statusFadeTimer);
+    _statusFadeTimer = null;
+  }
+  el.elt.textContent = next;
+  el.elt.style.opacity = '0.8';
+  _statusFadeTimer = setTimeout(() => {
+    el.elt.style.opacity = '0.35';
+    _statusFadeTimer = null;
+  }, 5000);
+}
+
+function invalidateSpaceBackgroundCache() {}
+
+/** Clear to transparent so #canvas-container CSS gradient shows through (WEBGL + alpha). */
+function drawSpaceBackground() {
+  clear();
 }

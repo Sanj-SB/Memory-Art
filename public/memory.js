@@ -37,6 +37,23 @@ function recalcBases() {
   memories.forEach((mem, mi) => { mem.baseCenter = getBaseCenter(mi, memories.length); });
 }
 
+/** At most MAX_GLYPH_UNITS clusters; extra words are merged into adjacent chunks. */
+function clusterWordsForGlyphs(words) {
+  const clean = words.filter(w => w && String(w).trim().length);
+  if (clean.length <= MAX_GLYPH_UNITS) return clean.map(w => String(w).toUpperCase().trim());
+  const n = clean.length;
+  const out = [];
+  let idx = 0;
+  for (let c = 0; c < MAX_GLYPH_UNITS; c++) {
+    const remainingSlots = MAX_GLYPH_UNITS - c;
+    const take = Math.ceil((n - idx) / remainingSlots);
+    const part = clean.slice(idx, idx + take);
+    idx += take;
+    out.push(part.join(' ').toUpperCase().replace(/\s+/g, ' ').trim());
+  }
+  return out;
+}
+
 function sampleWordCenters3D(count, radius, rng) {
   if (count <= 0) return [];
   const centers = [];
@@ -70,30 +87,27 @@ function rebuildNodes(memIdx) {
   const sentence = mem.sentence.toUpperCase();
   const R = getSphereR(), innerR = R * 0.68, spacing = min(width, height) * 0.052;
   const rng = mulberry32(seedVal + memIdx * 9999 + (mem.mergeCount || 0) * 777);
-  const words = sentence.replace(/[^A-Z ]/g, '').split(' ').filter(w => w.length);
-  if (!words.length) return;
+  const rawWords = sentence.replace(/[^A-Z ]/g, '').split(' ').filter(w => w.length);
+  if (!rawWords.length) return;
+  const words = clusterWordsForGlyphs(rawWords);
   const nodes = [];
   const wordCenters = sampleWordCenters3D(words.length, innerR * 0.88, rng);
-  words.forEach((word, wi) => {
+  words.forEach((cluster, wi) => {
     const wc = wordCenters[wi] || { x: 0, y: 0, z: 0 };
-    word.split('').forEach((letter, li) => {
-      if (!letter.match(/[A-Z]/)) return;
-      const t = word.length > 1 ? li / (word.length - 1) : 0.5;
-      const spread = spacing * (0.65 + word.length * 0.1);
-      const jx = (rng() - 0.5) * spread, jy = (rng() - 0.5) * spread, jz = (rng() - 0.5) * spread * 0.6;
-      const swirl = (t - 0.5) * spread * 0.65;
-      const ax = cos((wi + 1) * 1.7 + mem.id) * swirl;
-      const ay = sin((wi + 1) * 1.2 + mem.id) * swirl * 0.6;
-      const az = sin((wi + 1) * 1.1 + mem.id + 1.3) * swirl * 0.45;
-      let px = wc.x + jx + ax, py = wc.y + jy + ay, pz = wc.z + jz + az;
-      const len = sqrt(px * px + py * py + pz * pz);
-      if (len > innerR) { const sc = innerR / len; px *= sc; py *= sc; pz *= sc; }
-      nodes.push({
-        letter, wordIdx: wi, x: px, y: py, z: pz,
-        size: constrain(map(t, 0, 1, spacing * 1.7, spacing * 0.75) + (rng() - 0.5) * spacing * 0.3, 24, 100),
-        opacity: 0.78 + rng() * 0.22, tiltX: (rng() - 0.5) * 0.5, tiltY: (rng() - 0.5) * 0.5,
-        glyphIdx: nodes.length, colorPhase: mem.colorPhase,
-      });
+    const letter = cluster.replace(/[^A-Z]/g, '').charAt(0) || 'A';
+    const spread = spacing * (0.65 + min(cluster.length, 28) * 0.045);
+    const jx = (rng() - 0.5) * spread, jy = (rng() - 0.5) * spread, jz = (rng() - 0.5) * spread * 0.6;
+    const ax = cos((wi + 1) * 1.7 + mem.id) * spread * 0.12;
+    const ay = sin((wi + 1) * 1.2 + mem.id) * spread * 0.08;
+    const az = sin((wi + 1) * 1.1 + mem.id + 1.3) * spread * 0.06;
+    let px = wc.x + jx + ax, py = wc.y + jy + ay, pz = wc.z + jz + az;
+    const len = sqrt(px * px + py * py + pz * pz);
+    if (len > innerR) { const sc = innerR / len; px *= sc; py *= sc; pz *= sc; }
+    nodes.push({
+      letter, wordIdx: wi, x: px, y: py, z: pz,
+      size: constrain(spacing * 1.25 + (rng() - 0.5) * spacing * 0.35, 24, 100),
+      opacity: 0.78 + rng() * 0.22, tiltX: (rng() - 0.5) * 0.5, tiltY: (rng() - 0.5) * 0.5,
+      glyphIdx: nodes.length, colorPhase: mem.colorPhase,
     });
   });
   mem.nodes = nodes;
@@ -109,33 +123,30 @@ async function addMemory(sentence, anonymous) {
   const mi = memories.length, id = memIdCounter++;
   const colorPhase = id * 317;
   const rng = mulberry32(seedVal + mi * 9999);
-  const words = sentence.replace(/[^A-Z ]/g, '').split(' ').filter(w => w.length);
-  if (!words.length) return;
+  const rawWords = sentence.replace(/[^A-Z ]/g, '').split(' ').filter(w => w.length);
+  if (!rawWords.length) return;
+  const words = clusterWordsForGlyphs(rawWords);
 
   const R = getSphereR(), innerR = R * 0.68, spacing = min(width, height) * 0.052;
   const nodes = [];
   const wordCenters = sampleWordCenters3D(words.length, innerR * 0.88, rng);
-  words.forEach((word, wi) => {
+  words.forEach((cluster, wi) => {
     const wc = wordCenters[wi] || { x: 0, y: 0, z: 0 };
     const wcx = wc.x, wcy = wc.y, wcz = wc.z;
-    word.split('').forEach((letter, li) => {
-      if (!letter.match(/[A-Z]/)) return;
-      const t = word.length > 1 ? li / (word.length - 1) : 0.5;
-      const spread = spacing * (0.65 + word.length * 0.1);
-      const jx = (rng() - 0.5) * spread, jy = (rng() - 0.5) * spread, jz = (rng() - 0.5) * spread * 0.6;
-      const swirl = (t - 0.5) * spread * 0.65;
-      const ax = cos((wi + 1) * 1.7 + id) * swirl;
-      const ay = sin((wi + 1) * 1.2 + id) * swirl * 0.6;
-      const az = sin((wi + 1) * 1.1 + id + 1.3) * swirl * 0.45;
-      let px = wcx + jx + ax, py = wcy + jy + ay, pz = wcz + jz + az;
-      const len = sqrt(px * px + py * py + pz * pz);
-      if (len > innerR) { const sc = innerR / len; px *= sc; py *= sc; pz *= sc; }
-      nodes.push({
-        letter, wordIdx: wi, x: px, y: py, z: pz,
-        size: constrain(map(t, 0, 1, spacing * 1.7, spacing * 0.75) + (rng() - 0.5) * spacing * 0.3, 24, 100),
-        opacity: 0.78 + rng() * 0.22, tiltX: (rng() - 0.5) * 0.5, tiltY: (rng() - 0.5) * 0.5,
-        glyphIdx: nodes.length, colorPhase,
-      });
+    const letter = cluster.replace(/[^A-Z]/g, '').charAt(0) || 'A';
+    const spread = spacing * (0.65 + min(cluster.length, 28) * 0.045);
+    const jx = (rng() - 0.5) * spread, jy = (rng() - 0.5) * spread, jz = (rng() - 0.5) * spread * 0.6;
+    const ax = cos((wi + 1) * 1.7 + id) * spread * 0.12;
+    const ay = sin((wi + 1) * 1.2 + id) * spread * 0.08;
+    const az = sin((wi + 1) * 1.1 + id + 1.3) * spread * 0.06;
+    let px = wcx + jx + ax, py = wcy + jy + ay, pz = wcz + jz + az;
+    const len = sqrt(px * px + py * py + pz * pz);
+    if (len > innerR) { const sc = innerR / len; px *= sc; py *= sc; pz *= sc; }
+    nodes.push({
+      letter, wordIdx: wi, x: px, y: py, z: pz,
+      size: constrain(spacing * 1.25 + (rng() - 0.5) * spacing * 0.35, 24, 100),
+      opacity: 0.78 + rng() * 0.22, tiltX: (rng() - 0.5) * 0.5, tiltY: (rng() - 0.5) * 0.5,
+      glyphIdx: nodes.length, colorPhase,
     });
   });
 
@@ -195,34 +206,31 @@ function buildPreviewMemory(sentence) {
   const s = (sentence || '').trim().toUpperCase();
   if (!s) return null;
   if (s === previewMemCacheSentence && previewMemCache) return previewMemCache;
-  const words = s.replace(/[^A-Z ]/g, '').split(' ').filter(w => w.length);
-  if (!words.length) return null;
+  const rawWords = s.replace(/[^A-Z ]/g, '').split(' ').filter(w => w.length);
+  if (!rawWords.length) return null;
+  const words = clusterWordsForGlyphs(rawWords);
   const id = -1;
   const colorPhase = 317;
   const rng = mulberry32(seedVal + 99999);
   const R = 120, innerR = R * 0.68, spacing = min(width, height) * 0.052;
   const nodes = [];
   const wordCenters = sampleWordCenters3D(words.length, innerR * 0.88, rng);
-  words.forEach((word, wi) => {
+  words.forEach((cluster, wi) => {
     const wc = wordCenters[wi] || { x: 0, y: 0, z: 0 };
-    word.split('').forEach((letter, li) => {
-      if (!letter.match(/[A-Z]/)) return;
-      const t = word.length > 1 ? li / (word.length - 1) : 0.5;
-      const spread = spacing * (0.65 + word.length * 0.1);
-      const jx = (rng() - 0.5) * spread, jy = (rng() - 0.5) * spread, jz = (rng() - 0.5) * spread * 0.6;
-      const swirl = (t - 0.5) * spread * 0.65;
-      const ax = cos((wi + 1) * 1.7 + id) * swirl;
-      const ay = sin((wi + 1) * 1.2 + id) * swirl * 0.6;
-      const az = sin((wi + 1) * 1.1 + id + 1.3) * swirl * 0.45;
-      let px = wc.x + jx + ax, py = wc.y + jy + ay, pz = wc.z + jz + az;
-      const len = sqrt(px * px + py * py + pz * pz);
-      if (len > innerR) { const sc = innerR / len; px *= sc; py *= sc; pz *= sc; }
-      nodes.push({
-        letter, wordIdx: wi, x: px, y: py, z: pz,
-        size: constrain(map(t, 0, 1, spacing * 1.7, spacing * 0.75) + (rng() - 0.5) * spacing * 0.3, 24, 100),
-        opacity: 0.78 + rng() * 0.22, tiltX: (rng() - 0.5) * 0.5, tiltY: (rng() - 0.5) * 0.5,
-        glyphIdx: nodes.length, colorPhase
-      });
+    const letter = cluster.replace(/[^A-Z]/g, '').charAt(0) || 'A';
+    const spread = spacing * (0.65 + min(cluster.length, 28) * 0.045);
+    const jx = (rng() - 0.5) * spread, jy = (rng() - 0.5) * spread, jz = (rng() - 0.5) * spread * 0.6;
+    const ax = cos((wi + 1) * 1.7 + id) * spread * 0.12;
+    const ay = sin((wi + 1) * 1.2 + id) * spread * 0.08;
+    const az = sin((wi + 1) * 1.1 + id + 1.3) * spread * 0.06;
+    let px = wc.x + jx + ax, py = wc.y + jy + ay, pz = wc.z + jz + az;
+    const len = sqrt(px * px + py * py + pz * pz);
+    if (len > innerR) { const sc = innerR / len; px *= sc; py *= sc; pz *= sc; }
+    nodes.push({
+      letter, wordIdx: wi, x: px, y: py, z: pz,
+      size: constrain(spacing * 1.25 + (rng() - 0.5) * spacing * 0.35, 24, 100),
+      opacity: 0.78 + rng() * 0.22, tiltX: (rng() - 0.5) * 0.5, tiltY: (rng() - 0.5) * 0.5,
+      glyphIdx: nodes.length, colorPhase
     });
   });
   previewMemCacheSentence = s;

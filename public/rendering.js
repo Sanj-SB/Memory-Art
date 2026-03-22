@@ -1,7 +1,7 @@
 // WebGL rendering: sphere wireframes, glyphs, identity symbols.
 
-// ── Identity glyph on sphere (user's drawn symbol) ─────
-function drawIdentityGlyphOnSphere(R, mem) {
+// ── Identity glyph (flat in local XY, facing +Z) ─────
+function drawIdentityGlyphOnSphere(R, mem, alphaMult = 1) {
   try {
     if (mem.isAnonymous) return;
     const glyphSource = mem._sharedGlyph || identityGlyphData;
@@ -23,15 +23,14 @@ function drawIdentityGlyphOnSphere(R, mem) {
     strokeJoin(ROUND);
     const phase = (mem && mem.colorPhase != null ? mem.colorPhase : 0) + frameCount * 0.02;
     const vit = mem && mem.vitality != null ? mem.vitality : 1;
-    const alpha = 80 * vit * (0.6 + 0.4 * sin(phase * 0.1));
+    const alpha = 80 * vit * (0.6 + 0.4 * sin(phase * 0.1)) * alphaMult;
 
     push();
     translate(0, 0, R * 1.02);
     scale(1, -1);
 
-    // Core drawing — clean, flat, white
     stroke(220, 230, 255, alpha);
-    strokeWeight(R * 0.035);
+    strokeWeight(max(R * 0.035, 0.8));
     strokes.forEach(strokePts => {
       if (!Array.isArray(strokePts) || strokePts.length < 2) return;
       beginShape();
@@ -48,46 +47,131 @@ function drawIdentityGlyphOnSphere(R, mem) {
   }
 }
 
+/** Identity symbol centered inside the stamp bubble (not on the outer surface). */
+function drawIdentityGlyphInStampBubble(satR, mem, dir, alphaMult = 1) {
+  try {
+    if (mem.isAnonymous) return;
+    const glyphSource = mem._sharedGlyph || identityGlyphData;
+    if (!glyphSource || !Array.isArray(glyphSource) || glyphSource.length === 0) return;
+    const strokes = glyphSource;
+    const allPts = strokes.flat().filter(p => p && typeof p.x === 'number' && typeof p.y === 'number');
+    if (allPts.length < 2) return;
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    allPts.forEach(p => {
+      minX = min(minX, p.x); maxX = max(maxX, p.x);
+      minY = min(minY, p.y); maxY = max(maxY, p.y);
+    });
+    const w = maxX - minX || 1, h = maxY - minY || 1;
+    const scaleVal = (satR * 0.52) / max(w, h);
+    const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+
+    noFill();
+    strokeCap(ROUND);
+    strokeJoin(ROUND);
+    const phase = (mem && mem.colorPhase != null ? mem.colorPhase : 0) + frameCount * 0.02;
+    const vit = mem && mem.vitality != null ? mem.vitality : 1;
+    const alpha = 92 * vit * (0.6 + 0.4 * sin(phase * 0.1)) * alphaMult;
+
+    push();
+    translate(-dir.x * satR * 0.14, -dir.y * satR * 0.14, -dir.z * satR * 0.14);
+    scale(1, -1);
+
+    stroke(235, 242, 255, alpha);
+    strokeWeight(max(satR * 0.032, 0.65));
+    strokes.forEach(strokePts => {
+      if (!Array.isArray(strokePts) || strokePts.length < 2) return;
+      beginShape();
+      strokePts.forEach(p => {
+        if (p && typeof p.x === 'number' && typeof p.y === 'number')
+          vertex((p.x - cx) * scaleVal, (p.y - cy) * scaleVal, 0);
+      });
+      endShape();
+    });
+
+    pop();
+  } catch (e) {
+    console.warn('identity glyph in bubble skipped:', e);
+  }
+}
+
+function stampDirUnit(mem) {
+  const id = mem.id;
+  const u = sin(id * 0.71 + mem.colorPhase * 0.0001);
+  const v = cos(id * 0.53 + 1.3);
+  const w = sin(id * 0.37 + 2.1);
+  const len = sqrt(u * u + v * v + w * w) || 1;
+  return { x: u / len, y: v / len, z: w / len };
+}
+
+/** Smooth stamp bubble overlapping the main memory sphere (no stem line). */
+function drawStampSatellite(R, mem, distAlpha = 1) {
+  if (mem.isAnonymous) return;
+  const glyphSource = mem._sharedGlyph || identityGlyphData;
+  if (!glyphSource || !Array.isArray(glyphSource) || glyphSource.length === 0) return;
+  const vit = mem.vitality * distAlpha;
+  if (vit <= 0.02) return;
+
+  const satR = R * 0.24;
+  const overlap = 0.48;
+  const dir = stampDirUnit(mem);
+  const centerDist = R - satR * overlap;
+  const bx = dir.x * centerDist, by = dir.y * centerDist, bz = dir.z * centerDist;
+
+  const p = mem.colorPhase;
+  const cr = sin(p * 0.013) * 40 + 180, cg = sin(p * 0.021) * 40 + 190, cb = sin(p * 0.031) * 40 + 220;
+
+  push();
+  translate(bx, by, bz);
+  noStroke();
+  fill(
+    constrain(cr * 0.5 + 28, 0, 255),
+    constrain(cg * 0.5 + 32, 0, 255),
+    constrain(cb * 0.55 + 38, 0, 255),
+    78 * vit * distAlpha
+  );
+  sphere(satR, 14, 12);
+  const gl = typeof drawingContext !== 'undefined' ? drawingContext : null;
+  if (gl && gl.DEPTH_TEST) gl.disable(gl.DEPTH_TEST);
+  drawIdentityGlyphInStampBubble(satR, mem, dir, distAlpha);
+  if (gl && gl.DEPTH_TEST) gl.enable(gl.DEPTH_TEST);
+  pop();
+}
+
 // ── Morphing sphere wireframe ──────────────────────────
 function drawMemSphere(R, mem) {
-  const segs  = 120;
+  const segs = SPHERE_LISSAJOUS_SEGS;
   const pulse = 0.7 + 0.3 * sin(frameCount * 0.016 + mem.id);
-  const vit   = mem.vitality;
-  const p     = mem.colorPhase;
-  // Very pale — sphere is a hint, not the subject
-  const cr = sin(p*0.013)*40+180, cg = sin(p*0.021)*40+190, cb = sin(p*0.031)*40+220;
+  const vit = mem.vitality;
+  const p = mem.colorPhase;
+  const cr = sin(p * 0.013) * 40 + 180, cg = sin(p * 0.021) * 40 + 190, cb = sin(p * 0.031) * 40 + 220;
   const morph = mem.morphAmt, ms = mem.morphSeed;
 
   noFill();
 
-  // 4 wrapping Lissajous-style curves — each offset by a phase
-  // so together they imply the sphere volume without overwhelming it
-  const numCurves = 3 + floor(mem.mergeCount * 0.5);  // gains complexity with merges, max ~5
-  const clampedCurves = min(numCurves, 5);
+  const numCurves = 2 + floor(mem.mergeCount * 0.45);
+  const clampedCurves = min(numCurves, 4);
 
   for (let c = 0; c < clampedCurves; c++) {
     const phaseOff = (c / clampedCurves) * PI;
-    const freq     = 2 + c * 0.5 + morph * 0.8;   // morph adds complexity
-    const alpha    = 28 * vit * pulse;
+    const freq = 2 + c * 0.5 + morph * 0.8;
+    const alpha = 28 * vit * pulse;
 
     stroke(cr, cg, cb, alpha);
     strokeWeight(0.7);
     beginShape();
     for (let i = 0; i <= segs; i++) {
       const t = (i / segs) * TWO_PI;
-      // Lissajous on sphere surface with gentle noise displacement when morphed
-      const lat  = sin(freq * t + phaseOff);
-      const lon  = t + phaseOff * 0.5;
-      const mOff = morph > 0 ? (noise(c*1.3, i*0.04, ms) - 0.5) * morph * R * 0.22 : 0;
-      const r    = R + mOff;
-      const x    = r * cos(lon) * cos(lat * HALF_PI);
-      const y    = r * sin(lat * HALF_PI);
-      const z    = r * sin(lon) * cos(lat * HALF_PI);
+      const lat = sin(freq * t + phaseOff);
+      const lon = t + phaseOff * 0.5;
+      const mOff = morph > 0 ? (noise(c * 1.3, i * 0.04, ms) - 0.5) * morph * R * 0.22 : 0;
+      const r = R + mOff;
+      const x = r * cos(lon) * cos(lat * HALF_PI);
+      const y = r * sin(lat * HALF_PI);
+      const z = r * sin(lon) * cos(lat * HALF_PI);
       vertex(x, y, z);
     }
     endShape();
   }
-  drawIdentityGlyphOnSphere(R, mem);
 }
 
 // ── Draw one glyph (procedural) ─────────────────────────
@@ -122,16 +206,15 @@ function drawGlyph3D(nd, glyphs, mem, vit) {
   scale(s * (0.54 + 0.006 * sin(t + nd.glyphIdx * 0.2)));
   translate(j, -j * 0.55, 0);
 
-  // Aura blobs (very light, like the old tile ellipses)
   const aura = 0.35 + 0.65 * vit;
   noStroke();
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < 2; i++) {
     const f = phase + i * 19 + t * 12;
     fill(
       sin(f * 0.013) * 40 + inkR,
       sin(f * 0.021) * 40 + inkG,
       sin(f * 0.031) * 40 + inkB,
-      baseA * (0.05 + i * 0.02) * aura
+      baseA * (0.06 + i * 0.04) * aura
     );
     const ox = (noise(glyph.seed * 0.0002 + i * 3.1, t * 0.6) - 0.5) * 0.35;
     const oy = (noise(glyph.seed * 0.0002 + 9.2 + i * 2.2, t * 0.6) - 0.5) * 0.35;
@@ -173,9 +256,8 @@ function drawGlyph3D(nd, glyphs, mem, vit) {
     }
   }
 
-  // Soft sparkle layer
   if (GLYPH_SPARKLE_STRENGTH > 0 && glyph.nodes && glyph.nodes.length) {
-    const sparkStep = max(14, floor(glyph.nodes.length / 10));
+    const sparkStep = max(18, floor(glyph.nodes.length / 8));
     noStroke();
     for (let i = 0; i < glyph.nodes.length; i += sparkStep) {
       const p0 = glyph.nodes[i];
@@ -202,15 +284,15 @@ function drawGlyph3D(nd, glyphs, mem, vit) {
     }
     endShape(CLOSE);
 
-    // Marble veins — thick, visible coloured streaks that drift
     noFill();
-    for (let v = 0; v < 2; v++) {
+    {
+      const v = 0;
       const vPhase = phase + v * 47 + mT * 8;
       const vr = sin(vPhase * 0.017) * 70 + inkR * 0.6 + 100;
       const vg = sin(vPhase * 0.023) * 70 + inkG * 0.6 + 80;
       const vb = sin(vPhase * 0.033) * 70 + inkB * 0.6 + 60;
-      stroke(vr, vg, vb, baseA * (0.13 + v * 0.03));
-      strokeWeight(1.4 - v * 0.25);
+      stroke(vr, vg, vb, baseA * 0.15);
+      strokeWeight(1.25);
       beginShape();
       for (let i = 0; i < aPts.length; i++) {
         const ap = aPts[i];

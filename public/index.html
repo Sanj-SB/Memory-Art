@@ -24,13 +24,25 @@
     }
 
     body {
-      background: var(--bg);
       overflow: hidden;
       font-family: 'Inter', sans-serif;
       color: var(--text);
+      background:
+        radial-gradient(ellipse 140% 120% at 50% 42%, #243b78 0%, #121a3a 38%, #060a18 72%, #020308 100%),
+        radial-gradient(ellipse 80% 60% at 70% 18%, rgba(160, 190, 255, 0.12), transparent 55%),
+        radial-gradient(ellipse 90% 70% at 12% 88%, rgba(100, 80, 160, 0.08), transparent 50%),
+        var(--bg);
     }
 
-    #canvas-container { position:fixed; inset:0; z-index:0; }
+    #canvas-container {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      background:
+        radial-gradient(ellipse 130% 100% at 50% 40%, #1e3270 0%, #0c1430 45%, #040810 100%),
+        radial-gradient(ellipse 100% 80% at 65% 22%, rgba(140, 175, 255, 0.14), transparent 58%),
+        radial-gradient(ellipse 70% 90% at 18% 75%, rgba(90, 60, 140, 0.1), transparent 55%);
+    }
 
     #title {
       position: fixed;

@@ -1,5 +1,7 @@
 // Semantic gravity, overlap detection, and merge visuals.
 
+const DEBUG_PHYSICS = false;
+
 function applyGravity(R) {
   if (interactionMode === INTERACTION_MODE.COLLECTIVE) {
     for (let a = 0; a < memories.length; a++) {
@@ -41,16 +43,16 @@ function tickOverlap(R, t) {
     const { miA, miB } = activeOverlap;
     const A = memories[miA], B = memories[miB];
     if (!A || !B || A.cooldown > 0 || B.cooldown > 0 || A.isMerging || B.isMerging) {
-      console.log(`[DEBUG:OVERLAP] Active overlap cancelled (cooldown/merging) between #${miA} and #${miB}`);
+      if (DEBUG_PHYSICS) console.log(`[DEBUG:OVERLAP] Active overlap cancelled (cooldown/merging) between #${miA} and #${miB}`);
       activeOverlap = null;
     } else {
       const d = sphereDist(A.liveCenter, B.liveCenter);
       if (d <= stickThreshold) {
         activeOverlap.frames++;
-        if (activeOverlap.frames === 1) {
+        if (DEBUG_PHYSICS && activeOverlap.frames === 1) {
           console.log(`[DEBUG:OVERLAP] Memories #${miA} ("${A.sentence}") and #${miB} ("${B.sentence}") overlapping — dist=${d.toFixed(1)}`);
         }
-        if (activeOverlap.frames % 15 === 0) {
+        if (DEBUG_PHYSICS && activeOverlap.frames % 15 === 0) {
           console.log(`[DEBUG:OVERLAP] Progress: ${activeOverlap.frames}/${MERGE_FRAMES} (${(activeOverlap.frames / MERGE_FRAMES * 100).toFixed(0)}%)`);
         }
 
@@ -62,18 +64,18 @@ function tickOverlap(R, t) {
         A.vel.x += (mx - A.pos.x) * pullStr; A.vel.y += (my - A.pos.y) * pullStr; A.vel.z += (mz - A.pos.z) * pullStr;
         B.vel.x += (mx - B.pos.x) * pullStr; B.vel.y += (my - B.pos.y) * pullStr; B.vel.z += (mz - B.pos.z) * pullStr;
 
-        const slow = 0.92;
+        const slow = 0.97;
         A.vel.x *= slow; A.vel.y *= slow; A.vel.z *= slow;
         B.vel.x *= slow; B.vel.y *= slow; B.vel.z *= slow;
 
         if (activeOverlap.frames >= MERGE_FRAMES && !activeOverlap.hasMerged) {
           activeOverlap.hasMerged = true;
-          console.log(`[DEBUG:MERGE] Overlap complete — triggering merge: #${miA} ("${A.sentence}") ↔ #${miB} ("${B.sentence}")`);
+          if (DEBUG_PHYSICS) console.log(`[DEBUG:MERGE] Overlap complete — triggering merge: #${miA} ("${A.sentence}") ↔ #${miB} ("${B.sentence}")`);
           mergeMemories(miA, miB);
         }
         return;
       } else {
-        console.log(`[DEBUG:OVERLAP] Drifted apart at ${activeOverlap.frames}/${MERGE_FRAMES} — dist=${d.toFixed(1)}`);
+        if (DEBUG_PHYSICS) console.log(`[DEBUG:OVERLAP] Drifted apart at ${activeOverlap.frames}/${MERGE_FRAMES} — dist=${d.toFixed(1)}`);
         activeOverlap = null;
       }
     }
@@ -91,7 +93,7 @@ function tickOverlap(R, t) {
   }
   if (closestPair) {
     const [a, b] = closestPair;
-    console.log(`[DEBUG:COLLISION] New collision: #${a} ("${memories[a].sentence}") ↔ #${b} ("${memories[b].sentence}") — dist=${closestDist.toFixed(1)}, sim=${(getSim(a, b) * 100).toFixed(1)}%`);
+    if (DEBUG_PHYSICS) console.log(`[DEBUG:COLLISION] New collision: #${a} ("${memories[a].sentence}") ↔ #${b} ("${memories[b].sentence}") — dist=${closestDist.toFixed(1)}, sim=${(getSim(a, b) * 100).toFixed(1)}%`);
     activeOverlap = { miA: a, miB: b, frames: 0, hasMerged: false };
   } else {
     activeOverlap = null;
@@ -130,7 +132,7 @@ function drawOverlapEffect(R) {
       const py = lerp(a.y, b.y, t) + sin(frameCount * 0.12 + i * 2.5) * R * 0.08 * prog;
       const pz = lerp(a.z, b.z, t) + cos(frameCount * 0.12 + i * 2.5) * R * 0.08 * prog;
       fill(gr, gg, gb, 100 * prog * pulse);
-      push(); translate(px, py, pz); sphere(R * 0.025 * (0.5 + prog)); pop();
+      push(); translate(px, py, pz); sphere(R * 0.025 * (0.5 + prog), 6, 4); pop();
     }
   }
 
@@ -139,8 +141,8 @@ function drawOverlapEffect(R) {
     const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2, mz = (a.z + b.z) / 2;
     noStroke();
     fill(gr, gg, gb, 80 * pulse);
-    push(); translate(mx, my, mz); sphere(R * 0.2 * (0.7 + 0.3 * pulse)); pop();
+    push(); translate(mx, my, mz); sphere(R * 0.2 * (0.7 + 0.3 * pulse), 10, 8); pop();
     fill(255, 255, 255, 40 * pulse);
-    push(); translate(mx, my, mz); sphere(R * 0.35 * pulse); pop();
+    push(); translate(mx, my, mz); sphere(R * 0.35 * pulse, 8, 6); pop();
   }
 }

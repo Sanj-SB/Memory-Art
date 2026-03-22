@@ -50,6 +50,7 @@ function mouseWheel(e) {
 
 function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
+  invalidateSpaceBackgroundCache();
   if (authBuffer) { authBuffer = createGraphics(width, height); if (appState === APP_STATE.SYMBOL) initSymbolDrawing(); }
   brush.load(); recalcBases();
 }

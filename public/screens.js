@@ -1,7 +1,7 @@
 // Flow screen rendering: void, login, symbol, create, preview, final.
 
 function drawVoid() {
-  background(10, 18, 42);
+  drawSpaceBackground();
   const t = frameCount * 0.004;
 
   // Draw drifting shared memories from DB
@@ -29,21 +29,22 @@ function drawVoid() {
       const b = 160 + 50 * sin(hue * 0.031 + 1);
       const sz = 18 + 10 * sin(t * 2 + i);
       fill(r, g, b, 30);
-      sphere(sz * 1.4);
+      sphere(sz * 1.4, 12, 10);
       fill(r, g, b, 60);
-      sphere(sz);
+      sphere(sz, 12, 10);
       fill(r + 40, g + 30, b + 20, 90);
-      sphere(sz * 0.5);
+      sphere(sz * 0.5, 10, 8);
       pop();
     }
     pop();
   } else {
-    noStroke();
-    fill(60, 90, 180, 25);
-    for (let i = 5; i >= 0; i--) ellipse(0, 0, 100 + i * 60, 100 + i * 60);
+    push();
+    camera();
+    ortho(-width / 2, width / 2, height / 2, -height / 2, -10, 10);
     stroke(100, 140, 255, 35); strokeWeight(0.5);
     line(-100, 0, 100, 0); line(0, -100, 0, 100);
     noStroke();
+    pop();
   }
 
   // Overlay text (2D)
@@ -69,19 +70,19 @@ function drawVoid() {
 }
 
 function drawLogin() {
-  background(10, 18, 42);
+  drawSpaceBackground();
 }
 
 function drawSymbol() {
-  background(10, 18, 42);
+  drawSpaceBackground();
 }
 
 function drawCreateOrIdle() {
   if (mode === 'idle') {
-    background(10, 20, 50);
-    noStroke();
-    fill(60, 90, 180, 30);
-    for (let i = 4; i >= 0; i--) ellipse(0, 0, 80 + i * 48, 80 + i * 48);
+    drawSpaceBackground();
+    push();
+    camera();
+    ortho(-width / 2, width / 2, height / 2, -height / 2, -10, 10);
     stroke(100, 140, 255, 45);
     strokeWeight(0.5);
     line(-80, 0, 80, 0);
@@ -92,12 +93,13 @@ function drawCreateOrIdle() {
     textSize(12);
     textStyle(ITALIC);
     text('add a memory below', 0, 0);
+    pop();
   } else {
     // CREATE with memories: same as INTERACT but we're still in "add more" mode
-    background(10, 20, 50);
-    if (!isDragging) rotY += 0.003;
-    curRotX = lerp(curRotX, rotX, 0.06);
-    curRotY = lerp(curRotY, rotY, 0.06);
+    drawSpaceBackground();
+    if (!isDragging) rotY += 0.0048;
+    curRotX = lerp(curRotX, rotX, CAM_ROT_LERP);
+    curRotY = lerp(curRotY, rotY, CAM_ROT_LERP);
     if (clickedMem !== null) {
       labelAlpha = max(0, labelAlpha - 0.7);
       if (labelAlpha <= 0) {
@@ -138,6 +140,7 @@ function drawCreateOrIdle() {
       if (distAlpha <= 0) { pop(); return; }
       const spin = t * (0.13 + mi * 0.025);
       drawMemSphere(R, mem);
+      drawStampSatellite(R, mem, distAlpha);
       push();
       rotateY(spin);
       rotateX(spin * 0.6);
@@ -152,7 +155,7 @@ function drawCreateOrIdle() {
 }
 
 function drawPreview() {
-  background(10, 20, 50);
+  drawSpaceBackground();
   if (!pendingMemory) { appState = APP_STATE.CREATE; previewMemCache = null; return; }
   const mem = buildPreviewMemory(pendingMemory);
   if (mem) {
@@ -164,6 +167,7 @@ function drawPreview() {
     rotateX(0.15);
     translate(0, 0, 0);
     drawMemSphere(R, mem);
+    drawStampSatellite(R, mem);
     push();
     rotateY(t * 0.3);
     rotateX(t * 0.2);
@@ -189,13 +193,13 @@ function drawPreview() {
 }
 
 function drawFinal() {
-  background(10, 18, 42);
+  drawSpaceBackground();
   if (mode === 'display') {
     // Left-of-center view while in CREATE mode with memories.
     camera(-width * 0.6, 0, (height / 2 / tan(PI / 6)) + camZ, 0, 0, 0, 0, 1, 0);
-    if (!isDragging) rotY += 0.003;
-    curRotX = lerp(curRotX, rotX, 0.06);
-    curRotY = lerp(curRotY, rotY, 0.06);
+    if (!isDragging) rotY += 0.0048;
+    curRotX = lerp(curRotX, rotX, CAM_ROT_LERP);
+    curRotY = lerp(curRotY, rotY, CAM_ROT_LERP);
     const t = frameCount * 0.008;
     const R = getSphereR();
     applyGravity(R);
@@ -219,6 +223,7 @@ function drawFinal() {
       if (distAlpha <= 0) { pop(); return; }
       const spin = t * (0.13 + mi * 0.025);
       drawMemSphere(R, mem);
+      drawStampSatellite(R, mem, distAlpha);
       push();
       rotateY(spin);
       rotateX(spin * 0.6);
