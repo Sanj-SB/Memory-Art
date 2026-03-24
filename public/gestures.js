@@ -4,8 +4,9 @@
 // interactionMode, INTERACTION_MODE, switchMode.
 
 function showGestureTutorial() {
-  if (gestureTutorialShown) return;
+  if (gestureTutorialShown || !gestureTutorialPending) return;
   gestureTutorialShown = true;
+  gestureTutorialPending = false;
   const el = document.getElementById('gestureTutorial');
   if (el) el.style.display = 'flex';
 }

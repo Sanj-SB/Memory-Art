@@ -8,6 +8,12 @@ let glyphGraph = null;
 let memories = [];
 let memIdCounter = 0;
 let seedVal = 42;
+let collectiveLastShuffleAt = 0;
+let collectiveShuffleEveryMs = 50000;
+let collectiveActiveIds = new Set();
+let collectivePoolTotal = 0;
+let collectiveLastInteractionAt = 0;
+const COLLECTIVE_FORCE_INTERACTION_MS = 30000;
 
 const APP_STATE = { VOID: 'void', LOGIN: 'login', SYMBOL: 'symbol', CREATE: 'create', PREVIEW: 'preview', INTERACT: 'interact', FINAL: 'final' };
 const INTERACTION_MODE = { FLOAT: 'float', RAW: 'raw', RECALL: 'recall', COLLECTIVE: 'collective' };
@@ -22,6 +28,7 @@ let isAnonymous = false;
 let pendingMemory = null;
 let mode = 'idle';
 let rawFocusIdx = 0;
+let introPopupDismissed = false;
 
 let handpose = null;
 let handVideo = null;
@@ -31,6 +38,7 @@ let lastGesture = null;
 let lastGestureTime = 0;
 const GESTURE_DEBOUNCE = 800;
 let gestureTutorialShown = false;
+let gestureTutorialPending = false;
 
 let rotX = 0, rotY = 0, curRotX = 0, curRotY = 0;
 let isDragging = false, lastMX = 0, lastMY = 0, camZ = 0;
@@ -159,6 +167,69 @@ function setStatus(msg) {
     el.elt.style.opacity = '0.35';
     _statusFadeTimer = null;
   }, 5000);
+}
+
+function shuffled(arr) {
+  const out = arr.slice();
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const t = out[i];
+    out[i] = out[j];
+    out[j] = t;
+  }
+  return out;
+}
+
+function collectiveCandidates() {
+  const hasText = (m) => m && typeof m.sentence === 'string' && m.sentence.trim().length > 0;
+  return memories.filter(hasText);
+}
+
+function refreshPoolCounter() {
+  const el = document.getElementById('poolCounter');
+  if (!el) return;
+  const activeCount = collectiveActiveIds.size;
+  if (interactionMode === INTERACTION_MODE.COLLECTIVE && activeCount > 0) {
+    el.textContent = `pool ${collectivePoolTotal} · showing ${activeCount}`;
+  } else {
+    el.textContent = `pool ${collectivePoolTotal}`;
+  }
+}
+
+function reshuffleCollectiveSelection(force = false) {
+  const now = Date.now();
+  if (!force && now - collectiveLastShuffleAt < collectiveShuffleEveryMs) return false;
+  const pool = collectiveCandidates();
+  collectivePoolTotal = pool.length;
+  if (!pool.length) {
+    collectiveActiveIds = new Set();
+    collectiveLastShuffleAt = now;
+    refreshPoolCounter();
+    return false;
+  }
+  const targetCount = Math.min(pool.length, 6);
+  const owned = shuffled(pool.filter((m) => isMyMemory(m)));
+  const nonOwned = shuffled(pool.filter((m) => !isMyMemory(m)));
+  const ownedTarget = Math.min(owned.length, Math.min(3, targetCount));
+  const picked = owned.slice(0, ownedTarget);
+  const remaining = targetCount - picked.length;
+  picked.push(...nonOwned.slice(0, remaining));
+  if (picked.length < targetCount) {
+    const ownedRemainder = owned.slice(ownedTarget, ownedTarget + (targetCount - picked.length));
+    picked.push(...ownedRemainder);
+  }
+  collectiveActiveIds = new Set(picked.map((m) => m.id));
+  collectiveLastShuffleAt = now;
+  refreshPoolCounter();
+  return true;
+}
+
+function getCollectiveIndices() {
+  const out = [];
+  memories.forEach((m, i) => {
+    if (collectiveActiveIds.has(m.id)) out.push(i);
+  });
+  return out;
 }
 
 function invalidateSpaceBackgroundCache() {}

@@ -192,6 +192,9 @@ async function addMemory(sentence, anonymous) {
   }
 
   updateMemoryList();
+  collectivePoolTotal = collectiveCandidates().length;
+  refreshPoolCounter();
+  if (interactionMode === INTERACTION_MODE.COLLECTIVE) reshuffleCollectiveSelection(true);
   setStatus(`${memories.length} memor${memories.length > 1 ? 'ies' : 'y'} · similar memories attract each other`);
   mode = 'display';
   if (appState !== APP_STATE.INTERACT) appState = APP_STATE.INTERACT;

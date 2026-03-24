@@ -33,11 +33,29 @@
         radial-gradient(ellipse 90% 70% at 12% 88%, rgba(100, 80, 160, 0.08), transparent 50%),
         var(--bg);
     }
+    body::before {
+      content: '';
+      position: fixed;
+      inset: -20%;
+      z-index: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(ellipse 45% 35% at 20% 30%, rgba(170, 200, 255, 0.08), transparent 60%),
+        radial-gradient(ellipse 38% 30% at 78% 62%, rgba(185, 155, 255, 0.08), transparent 62%),
+        linear-gradient(120deg, rgba(255, 255, 255, 0.03), rgba(180, 205, 255, 0.01), rgba(255, 255, 255, 0.03));
+      transform: translate3d(0, 0, 0);
+      animation: bgShimmerDrift 24s ease-in-out infinite alternate;
+    }
+    @keyframes bgShimmerDrift {
+      0%   { transform: translate3d(-2%, -1%, 0) scale(1.02); opacity: 0.55; }
+      50%  { transform: translate3d(2%, 1%, 0) scale(1.04); opacity: 0.8; }
+      100% { transform: translate3d(-1%, 2%, 0) scale(1.03); opacity: 0.6; }
+    }
 
     #canvas-container {
       position: fixed;
       inset: 0;
-      z-index: 0;
+      z-index: 1;
       background:
         radial-gradient(ellipse 130% 100% at 50% 40%, #1e3270 0%, #0c1430 45%, #040810 100%),
         radial-gradient(ellipse 100% 80% at 65% 22%, rgba(140, 175, 255, 0.14), transparent 58%),
@@ -118,10 +136,11 @@
 
     #utils {
       position: fixed;
-      bottom: 28px; right: 28px;
+      bottom: 24px; right: 24px;
       z-index: 10;
       display: flex;
       gap: 20px;
+      align-items: center;
     }
     .util-btn {
       background: none; border: none; cursor: pointer;
@@ -129,7 +148,7 @@
       font-size: 9px; letter-spacing: 0.22em;
       text-transform: lowercase;
       color: rgba(150,165,210,0.22);
-      padding: 4px 0;
+      padding: 10px 6px;
       transition: color 0.25s;
     }
     .util-btn:hover { color: rgba(200,210,245,0.65); }
@@ -209,6 +228,44 @@
     .flow-btn-muted:hover { border-color: rgba(150, 165, 210, 0.45); }
 
     .flow-actions { position:fixed; bottom:80px; left:50%; transform:translateX(-50%); z-index:12; display:flex; gap:24px; }
+    .popup-overlay {
+      display:none;
+      position:fixed;
+      inset:0;
+      z-index:30;
+      background:rgba(5,8,20,0.38);
+      align-items:center;
+      justify-content:center;
+      padding:20px;
+      pointer-events:auto;
+    }
+    .popup-card {
+      width:min(760px, 92vw);
+      background:rgba(10,14,32,0.92);
+      border:1px solid rgba(170,180,235,0.28);
+      padding:26px 24px;
+      text-align:center;
+    }
+    .popup-title {
+      font-family:'Cormorant Garamond',serif;
+      font-size:22px;
+      letter-spacing:0.14em;
+      text-transform:uppercase;
+      color:rgba(220,230,255,0.95);
+    }
+    .popup-body {
+      margin-top:12px;
+      color:rgba(210,220,245,0.92);
+      line-height:1.7;
+      font-size:14px;
+    }
+    .popup-actions {
+      margin-top:20px;
+      display:flex;
+      gap:12px;
+      justify-content:center;
+      flex-wrap:wrap;
+    }
 
     /* Mode switcher: top-right, above timeline (z-index 24 > timeline 18) */
     .mode-switcher {
@@ -241,7 +298,7 @@
     .auth-instructions strong { color:rgba(230,220,255,0.95); }
     .auth-error { position:absolute; bottom:120px; left:50%; transform:translateX(-50%); color:#f88; font-size:11px; }
 
-    #gestureTutorial { display:flex; pointer-events:auto; }
+    #gestureTutorial { pointer-events:auto; }
     .gesture-title { font-size:14px; letter-spacing:0.2em; text-transform:uppercase; color:var(--dim); }
     .gesture-desc { font-size:11px; color:rgba(150,165,210,0.7); text-align:center; max-width:320px; }
 
@@ -352,6 +409,17 @@
     <button class="flow-btn" id="loginBtn">login</button>
     <button class="flow-btn flow-btn-muted" id="signupBtn">sign up</button>
   </div>
+  <div id="introOverlay" class="popup-overlay">
+    <div class="popup-card">
+      <p class="popup-title">MEMORY GLYPHS — VOID PROTOCOL</p>
+      <p style="margin-top:10px; color:rgba(255,90,90,0.96); letter-spacing:0.12em; text-transform:uppercase; font-size:12px;">2050 ALERT:</p>
+      <p class="popup-body">Your memories are no longer your own.<br/>They're harvested, remixed, weaponized.<br/><br/>But what exists in your mind is territory.<br/>This is your space to defend it.</p>
+      <div class="popup-actions">
+        <button class="flow-btn" id="closeIntroBtn">ENTER THE VOID</button>
+        <button class="flow-btn flow-btn-muted" id="leaveIntroBtn">LEAVE</button>
+      </div>
+    </div>
+  </div>
 
   <div id="loginOverlay" style="display:none; position:fixed; inset:0; z-index:15; background:rgba(8,13,31,0.95); pointer-events:auto; flex-direction:column; align-items:center; justify-content:center; gap:16px;">
     <p style="font-size:16px; color:rgba(200,215,255,0.9); font-style:italic; margin-bottom:8px;" id="loginTitle">login</p>
@@ -369,15 +437,17 @@
   <div id="symbolOverlay" style="display:none; position:fixed; inset:0; z-index:15; pointer-events:auto;">
     <canvas id="authDrawCanvas"></canvas>
     <div class="auth-instructions">
-      <p>Draw your identity symbol.</p>
-      <p>This will mark all your memories in the void.</p>
-      <p>Use a shape or pattern — no letters. Draw at least 2 strokes.</p>
+      <p style="font-size:18px; letter-spacing:0.14em; text-transform:uppercase; color:rgba(230,238,255,0.95);">MARK YOUR TERRITORY</p>
+      <p>Your stamp is your signature in the void.</p>
+      <p>It marks every memory you add as <em>yours</em>.</p>
+      <p>Untraceable, and known only to you.</p>
+      <p>Draw it once. It cannot be changed.</p>
     </div>
     <div id="symbolError" class="auth-error" style="display:none;"></div>
   </div>
   <div id="symbolDone" class="flow-actions" style="display:none; position:fixed; bottom:80px; left:50%; transform:translateX(-50%); z-index:16;">
-    <button class="flow-btn" id="symbolClearBtn">clear</button>
-    <button class="flow-btn" id="symbolDoneBtn">done</button>
+    <button class="flow-btn" id="symbolClearBtn">Draw</button>
+    <button class="flow-btn flow-btn-muted" id="symbolDoneBtn">Remain anonymous</button>
   </div>
 
   <div id="previewActions" class="flow-actions" style="display:none; z-index:100; pointer-events:auto;">
@@ -391,11 +461,15 @@
     <button class="flow-btn flow-btn-muted" type="button" id="focusNext">next →</button>
   </div>
 
-  <div id="gestureTutorial" style="display:none; position:fixed; inset:0; z-index:25; background:rgba(8,13,31,0.92); flex-direction:column; align-items:center; justify-content:center; gap:20px;">
-    <p class="gesture-title">hand gestures</p>
-    <p class="gesture-desc">Open palm → collective · Peace sign → recall · Fist → raw</p>
-    <button class="flow-btn" id="enableGesturesBtn">enable camera</button>
-    <button class="flow-btn flow-btn-muted" id="skipGesturesBtn">skip</button>
+  <div id="gestureTutorial" class="popup-overlay" style="z-index:32;">
+    <div class="popup-card">
+      <p class="popup-title">HAND PROTOCOL</p>
+      <p class="popup-body">In the future, gestures will let you select which memory version you live.<br/>Today, we practice.<br/><br/>Open palm → COLLECTIVE - Watch your memory interact with other's memories, evolve and get morphed.<br/>Peace sign → RECALL - Let the void stimulate biological recall, where each time you remember, you rewrite the memory ever so slightly.<br/>Fist → RAW - Your authentic, true memory, access this when you start feeling lost in all the changes and find yourself.</p>
+      <div class="popup-actions">
+        <button class="flow-btn" id="enableGesturesBtn">Try gesture recognition - enable camera</button>
+        <button class="flow-btn flow-btn-muted" id="skipGesturesBtn">Use buttons</button>
+      </div>
+    </div>
   </div>
 
   <!-- Mode switcher: top-right, always above timeline -->
@@ -412,15 +486,18 @@
   </div>
 
   <div id="utils">
+    <button class="flow-btn" id="enterMemoryQuickBtn" style="padding:12px 22px; font-size:11px;">Enter new memory</button>
     <button class="util-btn" id="toFinalBtn" style="display:none;">to final</button>
-    <button class="util-btn" id="reshuffleBtn">reshuffle</button>
-    <button class="util-btn" id="saveBtn">save</button>
+    <button class="util-btn" id="reshuffleBtn" style="display:none;">reshuffle</button>
+    <button class="util-btn" id="infoBtn" style="font-size:14px; letter-spacing:0.12em; color:rgba(208,220,250,0.85);">?</button>
+    <button class="util-btn" id="saveBtn" style="font-size:12px; letter-spacing:0.15em; color:rgba(220,230,255,0.92);">SAVE</button>
   </div>
 
   <div id="memLabel"></div>
 
   <div id="status">loading…</div>
-  <div id="llmStatus" style="position:fixed; top:28px; left:50%; transform:translateX(-50%); z-index:10; font-family:'Inter',sans-serif; font-size:8px; letter-spacing:0.2em; text-transform:uppercase; color:rgba(150,165,210,0.3); pointer-events:none;"></div>
+  <div id="poolCounter" style="position:fixed; top:62px; right:30px; z-index:20; font-family:'Inter',sans-serif; font-size:9px; letter-spacing:0.14em; text-transform:uppercase; color:rgba(190,205,245,0.72);">pool 0</div>
+  <div id="modeFlash" style="position:fixed; top:78px; left:50%; transform:translate(-50%,-8px); z-index:26; font-family:'Inter',sans-serif; font-size:12px; letter-spacing:0.2em; text-transform:uppercase; color:rgba(236,244,255,0.95); background:rgba(16,22,48,0.72); border:1px solid rgba(176,190,245,0.55); padding:8px 14px; opacity:0; pointer-events:none; transition:all .22s ease;"></div>
 
   <video id="handVideo" style="display:none;" playsinline muted></video>
   <div id="gestureDebug" style="display:none; position:fixed; bottom:190px; left:24px; z-index:20; font-family:'Inter',sans-serif; font-size:10px; letter-spacing:0.1em; color:rgba(200,220,255,0.9); background:rgba(0,0,0,0.5); padding:6px 12px; border-radius:4px; pointer-events:none;"></div>
@@ -432,6 +509,14 @@
   </div>
 
   <div id="canvas-container"></div>
+
+  <div id="infoOverlay" class="popup-overlay" style="z-index:35;">
+    <div class="popup-card" style="text-align:left;">
+      Its 2050 - everything you say is already heard, captured, infiltrated and monetised on. Now they've come for your individual memories, skewing them to get you to remember what they want so they can push for their products. Thats where the void comes in - silent, dark, intentionally untraceable unless you own the memory. If it exists in your brain, it should be yours to own, yours to manipulate and yours to give to the world, thats our principle.<br/><br/>
+      the void gives you a space to store your memories, but also watch them evolve and pick and chose which version of them you consiously use. the long term specualtion of this is that the void exists within your vrain using a brian chip, and that using hand gestures (stimulated rigth now with the camera) you can control whcih version of your memory - raw, recall or collective, you use in a situation.
+      <div class="popup-actions" style="justify-content:flex-end;"><button class="flow-btn flow-btn-muted" id="closeInfoBtn">close</button></div>
+    </div>
+  </div>
 
   <script>
     let _overlayHidden = false;

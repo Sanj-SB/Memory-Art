@@ -33,7 +33,10 @@ function switchMode(m) {
   } else if (m === 'collective') {
     interactionMode = INTERACTION_MODE.COLLECTIVE;
     console.log(`[DEBUG:MODE] Entered COLLECTIVE mode — memories will attract & merge`);
-    setStatus('collective · memories attract & merge');
+    loadSharedIntoInteract();
+    reshuffleCollectiveSelection(true);
+    collectiveLastInteractionAt = Date.now();
+    setStatus('collective · rotating memory subset');
   } else {
     interactionMode = INTERACTION_MODE.FLOAT;
     console.log(`[DEBUG:MODE] Entered FLOAT mode`);
@@ -53,6 +56,17 @@ function switchMode(m) {
 function applyGestureMode(gesture) {
   console.log(`[DEBUG:GESTURE] Gesture detected: "${gesture}" — switching mode`);
   switchMode(gesture);
+  setStatus(`gesture detected · ${gesture}`);
+  const modeFlash = document.getElementById('modeFlash');
+  if (modeFlash) {
+    modeFlash.textContent = `mode: ${gesture.toUpperCase()}`;
+    modeFlash.style.opacity = '1';
+    modeFlash.style.transform = 'translate(-50%, 0)';
+    setTimeout(() => {
+      modeFlash.style.opacity = '0';
+      modeFlash.style.transform = 'translate(-50%, -8px)';
+    }, 1200);
+  }
 }
 
 function ensureFadeEl() {
@@ -84,6 +98,7 @@ function updateFlowUI() {
   const ia = document.getElementById('inputArea');
   const utils = document.getElementById('utils');
   const title = document.getElementById('title');
+  const introOverlay = document.getElementById('introOverlay');
   const voidEnter = document.getElementById('voidEnter');
   const previewActions = document.getElementById('previewActions');
   const modeSwitcher = document.getElementById('modeSwitcher');
@@ -92,6 +107,7 @@ function updateFlowUI() {
   const symbolOverlay = document.getElementById('symbolOverlay');
   const symbolDone = document.getElementById('symbolDone');
   const focusNav = document.getElementById('focusNav');
+  const poolCounter = document.getElementById('poolCounter');
   if (!ia) return;
 
   const show = (el, v) => { if (el) el.style.display = v ? '' : 'none'; };
@@ -114,45 +130,57 @@ function updateFlowUI() {
   show(modeSwitcher, false);
   show(finalActions, false);
   show(focusNav, false);
+  show(poolCounter, false);
   show(skipBtn, false);
   if (handVideo) handVideo.style.display = 'none';
 
   if (appState === APP_STATE.VOID) {
     show(ia, false); show(utils, false); show(title, true);
     if (voidEnter) voidEnter.style.display = 'flex';
+    if (introOverlay) introOverlay.style.display = introPopupDismissed ? 'none' : 'flex';
     setStatus(currentUser ? 'the void · logged in' : 'the void');
   } else if (appState === APP_STATE.LOGIN) {
     show(ia, false); show(utils, false); show(title, false);
+    if (introOverlay) introOverlay.style.display = 'none';
     if (loginOverlay) loginOverlay.style.display = 'flex';
     setStatus('login');
   } else if (appState === APP_STATE.SYMBOL) {
     show(ia, false); show(utils, false); show(title, false);
+    if (introOverlay) introOverlay.style.display = 'none';
     show(symbolOverlay, true);
     if (symbolDone) symbolDone.style.display = 'flex';
     setStatus('draw your identity symbol');
   } else if (appState === APP_STATE.CREATE || appState === APP_STATE.INTERACT) {
-    if (appState === APP_STATE.INTERACT && memories.length > 0 && !gestureTutorialShown) showGestureTutorial();
-    show(ia, true); show(utils, true); show(title, true);
+    if (appState === APP_STATE.INTERACT && memories.length > 0 && !gestureTutorialShown && gestureTutorialPending) showGestureTutorial();
+    if (introOverlay) introOverlay.style.display = 'none';
+    show(ia, appState === APP_STATE.CREATE);
+    show(utils, appState === APP_STATE.INTERACT);
+    show(title, true);
     show(skipBtn, appState === APP_STATE.CREATE);
     show(modeSwitcher, appState === APP_STATE.INTERACT && memories.length > 0);
+    show(poolCounter, appState === APP_STATE.INTERACT);
     const ownedCount = getOwnedIndices().length;
     const showFocusNav = appState === APP_STATE.INTERACT && ownedCount > 1 &&
       (interactionMode === INTERACTION_MODE.RAW || interactionMode === INTERACTION_MODE.RECALL);
     if (focusNav) focusNav.style.display = showFocusNav ? 'flex' : 'none';
     const toFinalBtn = document.getElementById('toFinalBtn');
-    if (toFinalBtn) toFinalBtn.style.display = appState === APP_STATE.INTERACT && memories.length > 0 ? '' : 'none';
+    if (toFinalBtn) toFinalBtn.style.display = 'none';
     setStatus(appState === APP_STATE.CREATE ? 'add memories' : `${memories.length} memor${memories.length !== 1 ? 'ies' : 'y'}`);
   } else if (appState === APP_STATE.PREVIEW) {
     show(ia, false); show(utils, false); show(title, false);
+    if (introOverlay) introOverlay.style.display = 'none';
     show(previewActions, true);
     setStatus('preview');
   } else if (appState === APP_STATE.FINAL) {
     show(ia, false); show(utils, true); show(title, true);
+    if (introOverlay) introOverlay.style.display = 'none';
     show(modeSwitcher, true); show(finalActions, true);
+    show(poolCounter, true);
     const toFinalBtn = document.getElementById('toFinalBtn');
     if (toFinalBtn) toFinalBtn.style.display = 'none';
     setStatus('final artifact');
   }
+  refreshPoolCounter();
 }
 
 // Symbol drawing
@@ -246,6 +274,7 @@ function doStampPreview() {
   previewMemCache = null;
   previewMemCacheSentence = '';
   isAnonymous = false;
+  if (currentUser) gestureTutorialPending = true;
   transitionTo(APP_STATE.INTERACT);
   mode = 'display';
   curRotX = rotX; curRotY = rotY;

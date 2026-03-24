@@ -3,9 +3,13 @@
 const DEBUG_PHYSICS = false;
 
 function applyGravity(R) {
+  const collectiveIndices = interactionMode === INTERACTION_MODE.COLLECTIVE ? getCollectiveIndices() : null;
+  const activeIndices = collectiveIndices && collectiveIndices.length ? collectiveIndices : memories.map((_, i) => i);
   if (interactionMode === INTERACTION_MODE.COLLECTIVE) {
-    for (let a = 0; a < memories.length; a++) {
-      for (let b = a + 1; b < memories.length; b++) {
+    for (let ai = 0; ai < activeIndices.length; ai++) {
+      for (let bi = ai + 1; bi < activeIndices.length; bi++) {
+        const a = activeIndices[ai];
+        const b = activeIndices[bi];
         const sim = getSim(a, b);
         const lA = memories[a].pos, lB = memories[b].pos;
         const dx = lB.x - lA.x, dy = lB.y - lA.y, dz = lB.z - lA.z;
@@ -23,7 +27,9 @@ function applyGravity(R) {
     }
   }
 
-  memories.forEach(mem => {
+  activeIndices.forEach((idx) => {
+    const mem = memories[idx];
+    if (!mem) return;
     const bc = mem.baseCenter;
     mem.vel.x += (bc.x - mem.pos.x) * SPRING_K;
     mem.vel.y += (bc.y - mem.pos.y) * SPRING_K;
@@ -35,7 +41,8 @@ function applyGravity(R) {
 
 function tickOverlap(R, t) {
   if (interactionMode !== INTERACTION_MODE.COLLECTIVE) return;
-  if (memories.length < 2) return;
+  const activeIndices = getCollectiveIndices();
+  if (activeIndices.length < 2) return;
   const threshold = R * 2.2;
   const stickThreshold = threshold * 1.3;
 
@@ -83,8 +90,10 @@ function tickOverlap(R, t) {
 
   // Find closest pair — no phaseDiff gate
   let closestPair = null, closestDist = Infinity;
-  for (let a = 0; a < memories.length; a++) {
-    for (let b = a + 1; b < memories.length; b++) {
+  for (let ai = 0; ai < activeIndices.length; ai++) {
+    for (let bi = ai + 1; bi < activeIndices.length; bi++) {
+      const a = activeIndices[ai];
+      const b = activeIndices[bi];
       if (memories[a].cooldown > 0 || memories[b].cooldown > 0) continue;
       if (memories[a].isMerging || memories[b].isMerging) continue;
       const d = sphereDist(memories[a].liveCenter, memories[b].liveCenter);
@@ -95,8 +104,38 @@ function tickOverlap(R, t) {
     const [a, b] = closestPair;
     if (DEBUG_PHYSICS) console.log(`[DEBUG:COLLISION] New collision: #${a} ("${memories[a].sentence}") ↔ #${b} ("${memories[b].sentence}") — dist=${closestDist.toFixed(1)}, sim=${(getSim(a, b) * 100).toFixed(1)}%`);
     activeOverlap = { miA: a, miB: b, frames: 0, hasMerged: false };
+    collectiveLastInteractionAt = Date.now();
   } else {
     activeOverlap = null;
+    const now = Date.now();
+    if (now - collectiveLastInteractionAt >= COLLECTIVE_FORCE_INTERACTION_MS) {
+      let forcedPair = null;
+      let bestSim = -Infinity;
+      for (let ai = 0; ai < activeIndices.length; ai++) {
+        for (let bi = ai + 1; bi < activeIndices.length; bi++) {
+          const a = activeIndices[ai];
+          const b = activeIndices[bi];
+          const A = memories[a], B = memories[b];
+          if (!A || !B || A.cooldown > 0 || B.cooldown > 0 || A.isMerging || B.isMerging) continue;
+          const sim = getSim(a, b);
+          if (sim > bestSim) { bestSim = sim; forcedPair = [a, b]; }
+        }
+      }
+      if (forcedPair) {
+        const [a, b] = forcedPair;
+        const A = memories[a], B = memories[b];
+        const midX = (A.pos.x + B.pos.x) * 0.5;
+        const midY = (A.pos.y + B.pos.y) * 0.5;
+        const midZ = (A.pos.z + B.pos.z) * 0.5;
+        const sep = R * 0.45;
+        A.pos.x = midX - sep; B.pos.x = midX + sep;
+        A.pos.y = midY; B.pos.y = midY;
+        A.pos.z = midZ; B.pos.z = midZ;
+        A.vel.x += 0.12; B.vel.x -= 0.12;
+        activeOverlap = { miA: a, miB: b, frames: 0, hasMerged: false };
+        collectiveLastInteractionAt = now;
+      }
+    }
   }
 }
 

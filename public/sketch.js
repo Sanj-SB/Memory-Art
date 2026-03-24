@@ -30,19 +30,14 @@ function setup() {
     useModel = model;
     modelReady = true;
     setStatus('model ready · add your first memory');
-    const addBtn = document.getElementById('addBtn');
-    if (addBtn) addBtn.disabled = false;
   }).catch(err => {
     console.warn('USE load failed:', err);
     modelReady = false;
     setStatus('offline mode · add your first memory');
-    const addBtn = document.getElementById('addBtn');
-    if (addBtn) addBtn.disabled = false;
   });
 
-  const addBtn = document.getElementById('addBtn');
-  if (addBtn) { addBtn.disabled = true; select('#addBtn').mousePressed(triggerAdd); }
-  select('#reshuffleBtn').mousePressed(() => {
+  const reshuffleBtn = select('#reshuffleBtn');
+  if (reshuffleBtn) reshuffleBtn.mousePressed(() => {
     seedVal = floor(random(99999));
     initGlyphGraph();
     const sents = memories.map(m => m.originalSentence);
@@ -53,13 +48,19 @@ function setup() {
     sents.forEach(s => addMemory(s));
     appState = sents.length ? APP_STATE.INTERACT : APP_STATE.CREATE;
   });
-  select('#saveBtn').mousePressed(() => saveCanvas('memory-glyphs-' + Date.now(), 'png'));
-  select('#memInput').elt.addEventListener('keydown', e => {
+  const saveBtn = select('#saveBtn');
+  if (saveBtn) saveBtn.mousePressed(() => saveCanvas('memory-glyphs-' + Date.now(), 'png'));
+  const memInput = select('#memInput');
+  if (memInput) memInput.elt.addEventListener('keydown', e => {
     if (e.key !== 'Enter') return;
     if (e.isComposing) return;
     e.preventDefault();
     triggerAdd();
   });
+  const closeIntroBtn = document.getElementById('closeIntroBtn');
+  const leaveIntroBtn = document.getElementById('leaveIntroBtn');
+  if (closeIntroBtn) closeIntroBtn.addEventListener('click', () => { introPopupDismissed = true; });
+  if (leaveIntroBtn) leaveIntroBtn.addEventListener('click', () => { introPopupDismissed = true; });
 
   checkSession().then(loggedIn => {
     if (loggedIn && identityGlyphData) setStatus('welcome back');
@@ -122,9 +123,15 @@ function setup() {
   }
 
   const symbolDoneBtn = document.getElementById('symbolDoneBtn');
-  if (symbolDoneBtn) symbolDoneBtn.addEventListener('click', validateAndSaveSymbol);
+  if (symbolDoneBtn) symbolDoneBtn.addEventListener('click', () => {
+    identityGlyphData = null;
+    const overlay = document.getElementById('symbolOverlay');
+    if (overlay) overlay.style.display = 'none';
+    appState = APP_STATE.CREATE;
+    setStatus('anonymous identity active');
+  });
   const symbolClearBtn = document.getElementById('symbolClearBtn');
-  if (symbolClearBtn) symbolClearBtn.addEventListener('click', () => { if (appState === APP_STATE.SYMBOL) initSymbolDrawing(); });
+  if (symbolClearBtn) symbolClearBtn.addEventListener('click', validateAndSaveSymbol);
   const stampBtn = document.getElementById('stampBtn');
   if (stampBtn) stampBtn.addEventListener('click', () => { isAnonymous = false; doStampPreview(); });
   const anonStampBtn = document.getElementById('anonStampBtn');
@@ -137,6 +144,7 @@ function setup() {
   });
   const skipToVoidBtn = document.getElementById('skipToVoidBtn');
   if (skipToVoidBtn) skipToVoidBtn.addEventListener('click', () => {
+    if (currentUser) gestureTutorialPending = true;
     appState = APP_STATE.INTERACT; mode = 'display';
     curRotX = rotX; curRotY = rotY;
     loadSharedIntoInteract();
@@ -174,6 +182,19 @@ function setup() {
   if (releaseFinalBtn) releaseFinalBtn.addEventListener('click', () => { appState = APP_STATE.INTERACT; });
   const toFinalBtn = document.getElementById('toFinalBtn');
   if (toFinalBtn) toFinalBtn.addEventListener('click', () => { appState = APP_STATE.FINAL; });
+  const infoBtn = document.getElementById('infoBtn');
+  const enterMemoryQuickBtn = document.getElementById('enterMemoryQuickBtn');
+  const infoOverlay = document.getElementById('infoOverlay');
+  const closeInfoBtn = document.getElementById('closeInfoBtn');
+  if (infoBtn && infoOverlay) infoBtn.addEventListener('click', () => { infoOverlay.style.display = 'flex'; });
+  if (closeInfoBtn && infoOverlay) closeInfoBtn.addEventListener('click', () => { infoOverlay.style.display = 'none'; });
+  if (enterMemoryQuickBtn) enterMemoryQuickBtn.addEventListener('click', () => {
+    appState = APP_STATE.CREATE;
+    setTimeout(() => {
+      const inp = document.getElementById('memInput');
+      if (inp && inp.focus) inp.focus();
+    }, 20);
+  });
 
   const enableGesturesBtn = document.getElementById('enableGesturesBtn');
   if (enableGesturesBtn) enableGesturesBtn.addEventListener('click', () => { hideGestureTutorial(); initHandpose(); });
@@ -191,6 +212,10 @@ function setup() {
 }
 
 function draw() {
+  if (interactionMode === INTERACTION_MODE.COLLECTIVE) {
+    const didReshuffle = reshuffleCollectiveSelection(false);
+    if (didReshuffle) setStatus('collective · new memory slice surfaced');
+  }
   if (appState === APP_STATE.VOID)    { drawVoid(); updateFlowUI(); return; }
   if (appState === APP_STATE.LOGIN)   { drawLogin(); updateFlowUI(); return; }
   if (appState === APP_STATE.SYMBOL)  { drawSymbol(); updateFlowUI(); return; }
@@ -312,8 +337,10 @@ function draw() {
       curRotX = lerp(curRotX, rotX, CAM_ROT_LERP); curRotY = lerp(curRotY, rotY, CAM_ROT_LERP);
       camera(-width * 0.6, 0, (height / 2 / tan(PI / 6)) + camZ, 0, 0, 0, 0, 1, 0);
       applyGravity(R);
+      const collectiveSet = interactionMode === INTERACTION_MODE.COLLECTIVE ? collectiveActiveIds : null;
       const drift = R * 0.18;
       memories.forEach((mem, mi) => {
+        if (collectiveSet && !collectiveSet.has(mem.id)) return;
         const nx = noise(mi * 10 + t * 0.3, 0) - 0.5;
         const ny = noise(0, mi * 10 + t * 0.25) - 0.5;
         const nz = noise(mi * 10 + 100, t * 0.2 + 50) - 0.5;
@@ -324,6 +351,7 @@ function draw() {
         };
       });
       memories.forEach(mem => {
+        if (collectiveSet && !collectiveSet.has(mem.id)) return;
         if (!mem.isMerging) mem.vitality = max(0.08, mem.vitality - 0.000025);
         if (mem.cooldown > 0) mem.cooldown--;
       });
@@ -331,6 +359,7 @@ function draw() {
       push(); rotateX(curRotX); rotateY(curRotY);
       if (activeOverlap) drawOverlapEffect(R);
       memories.forEach((mem, mi) => {
+        if (collectiveSet && !collectiveSet.has(mem.id)) return;
         push();
         translate(mem.liveCenter.x, mem.liveCenter.y, mem.liveCenter.z);
         const distAlpha = getDistanceAlpha(mem.liveCenter);

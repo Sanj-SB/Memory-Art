@@ -92,7 +92,7 @@ async function loadVoidMemories() {
     const { data, error } = await supabaseClient
       .from('memories')
       .select('id, sentence, is_anonymous, identity_glyph, user_id, created_at')
-      .order('created_at', { ascending: false }).limit(50);
+      .order('created_at', { ascending: false }).limit(220);
     if (error) { console.warn('DB load error:', error.message); return; }
     voidMemories = data || [];
     voidMemoriesLoaded = true;
@@ -102,7 +102,8 @@ async function loadVoidMemories() {
 
 async function loadSharedIntoInteract() {
   if (!supabaseClient || !voidMemoriesLoaded) return;
-  const toLoad = voidMemories.slice(0, 5);
+  const shuffledPool = voidMemories.slice().sort(() => Math.random() - 0.5);
+  const toLoad = shuffledPool.slice(0, 40);
   for (const vm of toLoad) {
     const alreadyLoaded = memories.some(m => m.dbId === vm.id);
     if (alreadyLoaded) continue;
