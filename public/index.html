@@ -33,33 +33,21 @@
         radial-gradient(ellipse 90% 70% at 12% 88%, rgba(100, 80, 160, 0.08), transparent 50%),
         var(--bg);
     }
-    body::before {
-      content: '';
+
+    #void-bg {
       position: fixed;
-      inset: -20%;
+      inset: 0;
+      width: 100%;
+      height: 100%;
       z-index: 0;
       pointer-events: none;
-      background:
-        radial-gradient(ellipse 45% 35% at 20% 30%, rgba(170, 200, 255, 0.08), transparent 60%),
-        radial-gradient(ellipse 38% 30% at 78% 62%, rgba(185, 155, 255, 0.08), transparent 62%),
-        linear-gradient(120deg, rgba(255, 255, 255, 0.03), rgba(180, 205, 255, 0.01), rgba(255, 255, 255, 0.03));
-      transform: translate3d(0, 0, 0);
-      animation: bgShimmerDrift 24s ease-in-out infinite alternate;
-    }
-    @keyframes bgShimmerDrift {
-      0%   { transform: translate3d(-2%, -1%, 0) scale(1.02); opacity: 0.55; }
-      50%  { transform: translate3d(2%, 1%, 0) scale(1.04); opacity: 0.8; }
-      100% { transform: translate3d(-1%, 2%, 0) scale(1.03); opacity: 0.6; }
     }
 
     #canvas-container {
       position: fixed;
       inset: 0;
       z-index: 1;
-      background:
-        radial-gradient(ellipse 130% 100% at 50% 40%, #1e3270 0%, #0c1430 45%, #040810 100%),
-        radial-gradient(ellipse 100% 80% at 65% 22%, rgba(140, 175, 255, 0.14), transparent 58%),
-        radial-gradient(ellipse 70% 90% at 18% 75%, rgba(90, 60, 140, 0.1), transparent 55%);
+      background: transparent;
     }
 
     #title {
@@ -80,7 +68,7 @@
       margin-top: 5px;
       font-size: 10px;
       letter-spacing: 0.14em;
-      color: rgba(150,165,210,0.25);
+      color: rgba(189, 203, 245, 0.25);
       max-width: 240px;
       line-height: 1.7;
     }
@@ -117,7 +105,7 @@
       transition: border-color 0.4s, box-shadow 0.4s;
     }
     #memInput::placeholder {
-      color: rgba(180, 190, 230, 0.28);
+      color: rgba(186, 195, 233, 0.28);
       font-style: italic;
     }
     #memInput:focus {
@@ -394,14 +382,14 @@
 
   <div id="title">
     <h1>Imoria</h1>
-    <p>your memories, encoded. add two or more — watch them find each other.</p>
+    <p>your memories, encoded. add yours to join the void with other imorians.</p>
   </div>
 
   <div id="inputArea">
     <input id="memInput" type="text" maxlength="140"
            placeholder="what do you remember?"
            autocomplete="off" spellcheck="false"/>
-    <div id="hint">enter to add &nbsp;·&nbsp; drag to explore</div>
+    <div id="hint">enter to add</div>
     <button class="flow-btn flow-btn-muted" id="skipToVoidBtn" style="display:none; margin-top:4px; font-size:9px; padding:6px 20px;">enter the void</button>
   </div>
 
@@ -411,9 +399,9 @@
   </div>
   <div id="introOverlay" class="popup-overlay">
     <div class="popup-card">
-      <p class="popup-title">MEMORY GLYPHS — VOID PROTOCOL</p>
-      <p style="margin-top:10px; color:rgba(255,90,90,0.96); letter-spacing:0.12em; text-transform:uppercase; font-size:12px;">2050 ALERT:</p>
-      <p class="popup-body">Your memories are no longer your own.<br/>They're harvested, remixed, weaponized.<br/><br/>But what exists in your mind is territory.<br/>This is your space to defend it.</p>
+      <p class="popup-title">IMORIA — VOID PROTOCOL</h2>
+      <p style="margin-top:10px; color:rgba(255,90,90,0.96); letter-spacing:0.2em; text-transform:uppercase; font-size:14px;">2050 ALERT:</p>
+      <p class="popup-body">Your memories are no longer your own.<br/>They're harvested, remixed and weaponized.<br/><br/>But what exists in your mind is your territory.<br/>This is your space to defend it.</p>
       <div class="popup-actions">
         <button class="flow-btn" id="closeIntroBtn">ENTER THE VOID</button>
         <button class="flow-btn flow-btn-muted" id="leaveIntroBtn">LEAVE</button>
@@ -447,13 +435,13 @@
   </div>
   <div id="symbolDone" class="flow-actions" style="display:none; position:fixed; bottom:80px; left:50%; transform:translateX(-50%); z-index:16;">
     <button class="flow-btn" id="symbolClearBtn">Draw</button>
-    <button class="flow-btn flow-btn-muted" id="symbolDoneBtn">Remain anonymous</button>
+    <button class="flow-btn flow-btn-muted" id="symbolDoneBtn">Remain unmarked</button>
   </div>
 
   <div id="previewActions" class="flow-actions" style="display:none; z-index:100; pointer-events:auto;">
-    <button class="flow-btn" type="button" id="stampBtn">stamp</button>
-    <button class="flow-btn flow-btn-muted" type="button" id="anonStampBtn">anonymous</button>
-    <button class="flow-btn flow-btn-muted" type="button" id="cancelPreviewBtn">cancel</button>
+    <button class="flow-btn" type="button" id="stampBtn">Stamp</button>
+    <button class="flow-btn flow-btn-muted" type="button" id="anonStampBtn">Unmarked</button>
+    <button class="flow-btn flow-btn-muted" type="button" id="cancelPreviewBtn">Cancel</button>
   </div>
 
   <div id="focusNav" class="flow-actions" style="display:none; z-index:100; pointer-events:auto; bottom:140px;">
@@ -463,7 +451,7 @@
 
   <div id="gestureTutorial" class="popup-overlay" style="z-index:32;">
     <div class="popup-card">
-      <p class="popup-title">HAND PROTOCOL</p>
+      <p class="popup-title">CONTROL IN YOUR HANDS</p>
       <p class="popup-body">In the future, gestures will let you select which memory version you live.<br/>Today, we practice.<br/><br/>Open palm → COLLECTIVE - Watch your memory interact with other's memories, evolve and get morphed.<br/>Peace sign → RECALL - Let the void stimulate biological recall, where each time you remember, you rewrite the memory ever so slightly.<br/>Fist → RAW - Your authentic, true memory, access this when you start feeling lost in all the changes and find yourself.</p>
       <div class="popup-actions">
         <button class="flow-btn" id="enableGesturesBtn">Try gesture recognition - enable camera</button>
@@ -508,12 +496,13 @@
     <div class="tl-entries" id="tlEntries"></div>
   </div>
 
+  <canvas id="void-bg" aria-hidden="true"></canvas>
   <div id="canvas-container"></div>
 
   <div id="infoOverlay" class="popup-overlay" style="z-index:35;">
     <div class="popup-card" style="text-align:left;">
-      Its 2050 - everything you say is already heard, captured, infiltrated and monetised on. Now they've come for your individual memories, skewing them to get you to remember what they want so they can push for their products. Thats where the void comes in - silent, dark, intentionally untraceable unless you own the memory. If it exists in your brain, it should be yours to own, yours to manipulate and yours to give to the world, thats our principle.<br/><br/>
-      the void gives you a space to store your memories, but also watch them evolve and pick and chose which version of them you consiously use. the long term specualtion of this is that the void exists within your vrain using a brian chip, and that using hand gestures (stimulated rigth now with the camera) you can control whcih version of your memory - raw, recall or collective, you use in a situation.
+      It's 2050 - everything you say is already heard, captured, infiltrated and monetised on. Now they've come for your individual memories, skewing them to get you to remember what they want so they can push for their ways of life. That's where Imoria comes in, silent, dark, intentionally untraceable unless you own the memory. If it exists in your brain, it should be yours to own, yours to manipulate and yours to give to the world, thats our principle.<br/><br/>
+      The void gives you a space to store your memories, but also watch them evolve and pick and chose which version of them you consiously use. the long term specualtion of this is that the void exists within your vrain using a brian chip, and that using hand gestures (stimulated rigth now with the camera) you can control whcih version of your memory - raw, recall or collective, you use in a situation. <br/> <br/> Remember Open palm → COLLECTIVE - Watch your memory interact with other's memories, evolve and get morphed.<br/>Peace sign → RECALL - Let the void stimulate biological recall, where each time you remember, you rewrite the memory ever so slightly.<br/>Fist → RAW - Your authentic, true memory, access this when you start feeling lost in all the changes and find yourself.
       <div class="popup-actions" style="justify-content:flex-end;"><button class="flow-btn flow-btn-muted" id="closeInfoBtn">close</button></div>
     </div>
   </div>
@@ -530,6 +519,107 @@
       if (typeof modelReady !== 'undefined' && modelReady) { hideOverlay(); clearInterval(_poll); }
     }, 300);
     setTimeout(hideOverlay, 14000);
+  </script>
+
+  <script>
+    function initBreathingBg(canvasId) {
+      const canvas = document.getElementById(canvasId);
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      const resize = () => {
+        canvas.width = canvas.offsetWidth;
+        canvas.height = canvas.offsetHeight;
+      };
+      resize();
+      window.addEventListener('resize', resize);
+
+      let t = 0;
+
+      function blobPath(cx, cy, baseR, amp, numPts, phase, tLocal) {
+        ctx.beginPath();
+        for (let i = 0; i <= numPts; i++) {
+          const a = (i / numPts) * Math.PI * 2;
+          const r = baseR + amp * (
+            0.5 * Math.sin(a * 2 + tLocal * 0.35 + phase) +
+            0.3 * Math.sin(a * 3 - tLocal * 0.20 + phase * 1.3) +
+            0.2 * Math.sin(a * 1 + tLocal * 0.28 + phase * 0.7)
+          );
+          i === 0
+            ? ctx.moveTo(cx + r * Math.cos(a), cy + r * Math.sin(a))
+            : ctx.lineTo(cx + r * Math.cos(a), cy + r * Math.sin(a));
+        }
+        ctx.closePath();
+      }
+
+      function draw() {
+        const W = canvas.width, H = canvas.height;
+        const S = Math.min(W, H);
+
+        ctx.clearRect(0, 0, W, H);
+
+        ctx.fillStyle = '#05081a';
+        ctx.fillRect(0, 0, W, H);
+
+        const spot = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, S * 0.52);
+        spot.addColorStop(0,    'rgba(26, 28, 52, 0)');
+        spot.addColorStop(0.72, 'rgba(20, 45, 120, 0.62)');
+        spot.addColorStop(1,    'rgba(10, 12, 36, 0.92)');
+        ctx.fillStyle = spot;
+        ctx.fillRect(0, 0, W, H);
+
+        const blobs = [
+          { cx: 0,   cy: 0,   r: S * 0.48, amp: S * 0.11, phase: 0   },
+          { cx: W,   cy: 0,   r: S * 0.44, amp: S * 0.10, phase: 1.4 },
+          { cx: W,   cy: H,   r: S * 0.50, amp: S * 0.12, phase: 2.8 },
+          { cx: 0,   cy: H,   r: S * 0.46, amp: S * 0.09, phase: 4.2 },
+          { cx: W/2, cy: 0,   r: S * 0.32, amp: S * 0.08, phase: 0.7 },
+          { cx: W,   cy: H/2, r: S * 0.32, amp: S * 0.08, phase: 2.1 },
+          { cx: W/2, cy: H,   r: S * 0.32, amp: S * 0.08, phase: 3.5 },
+          { cx: 0,   cy: H/2, r: S * 0.32, amp: S * 0.08, phase: 4.9 },
+        ];
+
+        blobs.forEach((b) => {
+          const breathe = 0.88 + 0.12 * Math.sin(t * 0.6 + b.phase);
+          const alpha = 0.14 * breathe;
+          const grad = ctx.createRadialGradient(b.cx, b.cy, 0, b.cx, b.cy, b.r * 1.1);
+          grad.addColorStop(0,    `rgba(125, 185, 245, ${alpha * 1.15})`);
+          grad.addColorStop(0.4,  `rgba(90, 130, 225, ${alpha * 0.8})`);
+          grad.addColorStop(0.75, `rgba(35, 65, 150, ${alpha * 0.45})`);
+          grad.addColorStop(1,    'rgba(6, 8, 22, 0)');
+
+          blobPath(b.cx, b.cy, b.r * breathe, b.amp, 80, b.phase, t);
+          ctx.save();
+          ctx.globalCompositeOperation = 'screen';
+          ctx.fillStyle = grad;
+          ctx.fill();
+          ctx.restore();
+        });
+
+        const vig = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.max(W, H) * 0.72);
+        vig.addColorStop(0.55, 'rgba(0, 0, 0, 0)');
+        vig.addColorStop(1,    'rgba(3, 4, 12, 0.7)');
+        ctx.fillStyle = vig;
+        ctx.fillRect(0, 0, W, H);
+
+        // Extra "breathable" breathing canvas fade: darker top/bottom so memories read first.
+        const topBottom = ctx.createLinearGradient(0, 0, 0, H);
+        topBottom.addColorStop(0.0, 'rgba(0, 0, 0, 0.26)');
+        topBottom.addColorStop(0.35,'rgba(0, 0, 0, 0)');
+        topBottom.addColorStop(0.65,'rgba(0, 0, 0, 0)');
+        topBottom.addColorStop(1.0, 'rgba(0, 0, 0, 0.30)');
+        ctx.fillStyle = topBottom;
+        ctx.fillRect(0, 0, W, H);
+
+        t += 0.012;
+        requestAnimationFrame(draw);
+      }
+
+      draw();
+    }
+
+    initBreathingBg('void-bg');
   </script>
 
   <!-- Load order: globals first, then modules, sketch last -->

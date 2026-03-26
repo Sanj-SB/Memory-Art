@@ -2,8 +2,8 @@
 
 :root{
   --bg: #080d1f;
-  --ink: rgba(245,246,255,0.88);
-  --muted: rgba(245,246,255,0.50);
+  --ink: rgb(245, 246, 255);
+  --muted: rgba(245, 246, 255, 0.798);
   --hair: rgba(255,255,255,0.10);
   --glow: rgba(180,160,255,0.15);
 }
@@ -80,7 +80,7 @@ canvas{ display:block; }
   border-bottom:1px solid var(--hair);
   padding:12px 2px 10px 2px;
   outline:none;
-  color:rgba(246, 247, 251, 0.88);
+  color:rgba(246, 247, 251, 0.953);
   font-family:"Cormorant Garamond", serif;
   font-style:italic;
   font-size:22px;
