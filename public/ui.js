@@ -77,7 +77,7 @@ function ensureFadeEl() {
     position: 'fixed', inset: '0', zIndex: '9999', pointerEvents: 'none',
     opacity: '0',
     background: 'radial-gradient(ellipse at center, rgba(60,50,140,0.85) 0%, rgba(10,15,35,0.97) 70%)',
-    transition: 'opacity 1.5s ease',
+    transition: 'opacity 1.2s ease',
   });
   document.body.appendChild(_fadeEl);
   return _fadeEl;
