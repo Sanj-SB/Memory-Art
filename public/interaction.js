@@ -50,7 +50,8 @@ function mouseWheel(e) {
 
 function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
+  if (window.threeMemoryRenderer) window.threeMemoryRenderer.resize(windowWidth, windowHeight);
   invalidateSpaceBackgroundCache();
   if (authBuffer) { authBuffer = createGraphics(width, height); if (appState === APP_STATE.SYMBOL) initSymbolDrawing(); }
-  brush.load(); recalcBases();
+  recalcBases();
 }

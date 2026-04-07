@@ -60,7 +60,10 @@ const GRAVITY_K = 0.028;
 const DAMPING = 0.998;
 const SPRING_K = 0.0065;
 
-const MAX_GLYPH_UNITS = 10;
+// Upper bound on distinct glyph units per memory. Keep this low so
+// long memories produce a smaller set of more complex glyphs rather
+// than many tiny ones crowding the sphere.
+const MAX_GLYPH_UNITS = 8;
 const CAM_ROT_LERP = 0.14;
 
 let useModel = null;
@@ -69,6 +72,10 @@ const simCache = {};
 
 const FIXED_SPHERE_R = 120;
 function getSphereR() { return FIXED_SPHERE_R; }
+function getMemorySphereR(glyphCount) {
+  const n = Math.max(1, glyphCount || 1);
+  return constrain(FIXED_SPHERE_R * (0.78 + Math.sqrt(n) * 0.1), 84, 230);
+}
 
 function simKey(a, b) { return `${Math.min(a, b)}-${Math.max(a, b)}`; }
 function getSim(a, b) { return simCache[simKey(a, b)] || 0; }

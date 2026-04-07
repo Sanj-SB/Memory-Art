@@ -5,6 +5,23 @@
 // ═══════════════════════════════════════════════════════
 
 let glyphFont;
+let _threeRetryAt = 0;
+
+function ensureThreeRendererReady() {
+  if (!window.threeMemoryRenderer) return false;
+  if (window.threeMemoryRenderer.isReady && window.threeMemoryRenderer.isReady()) return true;
+  const now = millis ? millis() : Date.now();
+  if (now < _threeRetryAt) return false;
+  _threeRetryAt = now + 1200;
+  try {
+    const ok = window.threeMemoryRenderer.init(document.getElementById('canvas-container'));
+    if (ok) console.log('[three-renderer] initialized after retry');
+    return !!ok;
+  } catch (e) {
+    console.warn('[three-renderer] retry init failed:', e);
+    return false;
+  }
+}
 
 function preload() {
   glyphFont = loadFont('https://cdnjs.cloudflare.com/ajax/libs/topcoat/0.8.0/font/SourceCodePro-Regular.otf');
@@ -12,10 +29,25 @@ function preload() {
 
 function setup() {
   if (typeof setAttributes === 'function') setAttributes({ alpha: true });
-  createCanvas(windowWidth, windowHeight, WEBGL).parent('canvas-container');
-  ambientLight(85, 92, 125);
+  const cv = createCanvas(windowWidth, windowHeight).parent('canvas-container');
+  cv.style('position', 'absolute');
+  cv.style('inset', '0');
+  cv.style('z-index', '2');
+  cv.style('background', 'transparent');
+  cv.style('pointer-events', 'none');
+  if (window.threeMemoryRenderer) {
+    try {
+      const ok = window.threeMemoryRenderer.init(document.getElementById('canvas-container'));
+      if (!ok) {
+        console.warn('[setup] Three renderer init returned false (will retry).');
+        setStatus('visual renderer unavailable');
+      }
+    } catch (e) {
+      console.warn('[setup] Three renderer failed; continuing app flow:', e);
+      setStatus('visual renderer unavailable');
+    }
+  }
   if (glyphFont) textFont(glyphFont);
-  brush.load();
   initGlyphGraph();
   authBuffer = createGraphics(width, height);
   authBuffer.clear();
@@ -26,15 +58,23 @@ function setup() {
   checkLLM();
 
   setStatus('loading semantic model…');
-  use.load().then(model => {
-    useModel = model;
-    modelReady = true;
-    setStatus('model ready · add your first memory');
-  }).catch(err => {
-    console.warn('USE load failed:', err);
-    modelReady = false;
-    setStatus('offline mode · add your first memory');
-  });
+  (async () => {
+    try {
+      if (window.tf && typeof window.tf.ready === 'function') await window.tf.ready();
+      if (window.tf && typeof window.tf.setBackend === 'function') {
+        try { await window.tf.setBackend('webgl'); }
+        catch { await window.tf.setBackend('cpu'); }
+      }
+      const model = await use.load();
+      useModel = model;
+      modelReady = true;
+      setStatus('model ready · add your first memory');
+    } catch (err) {
+      console.warn('USE load failed:', err);
+      modelReady = false;
+      setStatus('offline mode · add your first memory');
+    }
+  })();
 
   const reshuffleBtn = select('#reshuffleBtn');
   if (reshuffleBtn) reshuffleBtn.mousePressed(() => {
@@ -212,6 +252,8 @@ function setup() {
 }
 
 function draw() {
+  clear();
+  ensureThreeRendererReady();
   if (interactionMode === INTERACTION_MODE.COLLECTIVE) {
     const didReshuffle = reshuffleCollectiveSelection(false);
     if (didReshuffle) setStatus('collective · new memory slice surfaced');
@@ -223,12 +265,10 @@ function draw() {
   if (appState === APP_STATE.PREVIEW) { drawPreview(); updateFlowUI(); return; }
   if (appState === APP_STATE.FINAL)   { drawFinal(); updateFlowUI(); return; }
 
-  // INTERACT
   if (mode === 'idle') {
-    drawSpaceBackground();
+    if (window.threeMemoryRenderer) window.threeMemoryRenderer.clear();
     push();
-    camera();
-    ortho(-width / 2, width / 2, height / 2, -height / 2, -10, 10);
+    translate(width / 2, height / 2);
     stroke(100, 140, 255, 45); strokeWeight(0.5);
     line(-80, 0, 80, 0); line(0, -80, 0, 80); noStroke();
     pop();
@@ -236,7 +276,6 @@ function draw() {
   }
 
   if (mode === 'display') {
-    drawSpaceBackground();
     const t = frameCount * 0.008;
     const R = getSphereR();
 
@@ -252,10 +291,8 @@ function draw() {
       }
     }
 
-    // RAW MODE
     if (interactionMode === INTERACTION_MODE.RAW && rawFocusIdx >= 0 && rawFocusIdx < memories.length && isMyMemory(memories[rawFocusIdx])) {
       hideAllMemoryLabels();
-      camera(0, 0, (height / 2 / tan(PI / 6)) + camZ, 0, 0, 0, 0, 1, 0);
       if (!isDragging) rotY += 0.0032;
       curRotX = lerp(curRotX, rotX, CAM_ROT_LERP); curRotY = lerp(curRotY, rotY, CAM_ROT_LERP);
       const mem = memories[rawFocusIdx];
@@ -265,26 +302,20 @@ function draw() {
         mem._rawSnapshot = { nodes: mem.nodes, glyphs: mem.glyphs };
         mem.sentence = savedSentence; mem.nodes = savedNodes; mem.glyphs = savedGlyphs;
       }
-      push(); rotateX(curRotX); rotateY(curRotY);
-      drawMemSphere(R, mem);
-      drawStampSatellite(R, mem);
-      const spin = t * 0.15;
-      push(); rotateY(spin); rotateX(spin * 0.6);
-      fill(255, 255, 255, 255 * mem.vitality);
-      mem._rawSnapshot.nodes.forEach(nd => drawGlyph3D(nd, mem._rawSnapshot.glyphs, mem, mem.vitality));
-      pop(); pop();
-      push(); camera(); ortho(-width / 2, width / 2, height / 2, -height / 2, -10, 10);
+      const rawMem = { ...mem, nodes: mem._rawSnapshot.nodes, glyphs: mem._rawSnapshot.glyphs, liveCenter: { x: 0, y: 0, z: 0 } };
+      if (window.threeMemoryRenderer) {
+        window.threeMemoryRenderer.renderMemories({ memories: [rawMem], R, rotX: curRotX, rotY: curRotY, camZ, leftShift: 0 });
+      }
+      push();
       noStroke(); fill(200, 215, 255, 200);
       textAlign(CENTER, CENTER); textSize(14); textStyle(ITALIC);
-      text(`"${mem.originalSentence}"`, 0, height / 2 - 60);
+      text(`"${mem.originalSentence}"`, width / 2, height - 60);
       textSize(9); textStyle(NORMAL); fill(150, 170, 220, 100);
       const ownedR = getOwnedIndices(); const posR = ownedR.indexOf(rawFocusIdx) + 1;
-      text(`raw · ${posR} / ${ownedR.length}`, 0, height / 2 - 35); pop();
-    }
-    // RECALL MODE
-    else if (interactionMode === INTERACTION_MODE.RECALL && rawFocusIdx >= 0 && rawFocusIdx < memories.length && isMyMemory(memories[rawFocusIdx])) {
+      text(`raw · ${posR} / ${ownedR.length}`, width / 2, height - 35);
+      pop();
+    } else if (interactionMode === INTERACTION_MODE.RECALL && rawFocusIdx >= 0 && rawFocusIdx < memories.length && isMyMemory(memories[rawFocusIdx])) {
       hideAllMemoryLabels();
-      camera(0, 0, (height / 2 / tan(PI / 6)) + camZ, 0, 0, 0, 0, 1, 0);
       if (!isDragging) rotY += 0.0032;
       curRotX = lerp(curRotX, rotX, CAM_ROT_LERP); curRotY = lerp(curRotY, rotY, CAM_ROT_LERP);
       const mem = memories[rawFocusIdx];
@@ -293,7 +324,6 @@ function draw() {
         const chainFromPrior =
           typeof normalizeMemoryText === 'function' &&
           normalizeMemoryText(sourceText) !== normalizeMemoryText(mem.originalSentence);
-        console.log(`[DEBUG:RECALL] Initiating recall for #${rawFocusIdx} (from ${chainFromPrior ? 'current' : 'original'} text)`);
         mem._recallLoading = true;
         applyRecallTransform(sourceText, { chainFromPrior }).then(result => {
           const txt = result || sourceText;
@@ -301,10 +331,7 @@ function draw() {
           mem.sentence = txt;
           mem._recallApplied = true;
           mem._recallLoading = false;
-          console.log(`[DEBUG:RECALL] Transform: "${sourceText}" → "${txt}"`);
-          if (mem.timeline) {
-            mem.timeline.push({ type: 'recall', text: txt, prev: sourceText, time: Date.now() });
-          }
+          if (mem.timeline) mem.timeline.push({ type: 'recall', text: txt, prev: sourceText, time: Date.now() });
           rebuildNodes(rawFocusIdx);
           populateTimeline();
           updateMemoryList();
@@ -315,27 +342,21 @@ function draw() {
           rebuildNodes(rawFocusIdx);
         });
       }
-      push(); rotateX(curRotX); rotateY(curRotY);
-      drawMemSphere(R, mem);
-      drawStampSatellite(R, mem);
-      const spin = t * 0.15;
-      push(); rotateY(spin); rotateX(spin * 0.6);
-      fill(255, 255, 255, 255 * mem.vitality);
-      mem.nodes.forEach(nd => drawGlyph3D(nd, mem.glyphs, mem, mem.vitality));
-      pop(); pop();
-      push(); camera(); ortho(-width / 2, width / 2, height / 2, -height / 2, -10, 10);
+      const recallMem = { ...mem, liveCenter: { x: 0, y: 0, z: 0 } };
+      if (window.threeMemoryRenderer) {
+        window.threeMemoryRenderer.renderMemories({ memories: [recallMem], R, rotX: curRotX, rotY: curRotY, camZ, leftShift: 0 });
+      }
+      push();
       noStroke(); fill(200, 215, 255, 200);
       textAlign(CENTER, CENTER); textSize(12); textStyle(ITALIC);
-      text(mem._recallLoading ? 'recalling…' : 'recall mode', 0, height / 2 - 60);
+      text(mem._recallLoading ? 'recalling…' : 'recall mode', width / 2, height - 60);
       textSize(9); textStyle(NORMAL); fill(150, 170, 220, 100);
       const ownedC = getOwnedIndices(); const posC = ownedC.indexOf(rawFocusIdx) + 1;
-      text(`recall · ${posC} / ${ownedC.length}`, 0, height / 2 - 35); pop();
-    }
-    // FLOAT / COLLECTIVE
-    else {
+      text(`recall · ${posC} / ${ownedC.length}`, width / 2, height - 35);
+      pop();
+    } else {
       if (!isDragging) rotY += 0.0048;
       curRotX = lerp(curRotX, rotX, CAM_ROT_LERP); curRotY = lerp(curRotY, rotY, CAM_ROT_LERP);
-      camera(-width * 0.6, 0, (height / 2 / tan(PI / 6)) + camZ, 0, 0, 0, 0, 1, 0);
       applyGravity(R);
       const collectiveSet = interactionMode === INTERACTION_MODE.COLLECTIVE ? collectiveActiveIds : null;
       const drift = R * 0.18;
@@ -344,11 +365,7 @@ function draw() {
         const nx = noise(mi * 10 + t * 0.3, 0) - 0.5;
         const ny = noise(0, mi * 10 + t * 0.25) - 0.5;
         const nz = noise(mi * 10 + 100, t * 0.2 + 50) - 0.5;
-        mem.liveCenter = {
-          x: mem.pos.x + nx * drift * 2,
-          y: mem.pos.y + ny * drift * 1.2,
-          z: mem.pos.z + nz * drift * 1.4,
-        };
+        mem.liveCenter = { x: mem.pos.x + nx * drift * 2, y: mem.pos.y + ny * drift * 1.2, z: mem.pos.z + nz * drift * 1.4 };
       });
       memories.forEach(mem => {
         if (collectiveSet && !collectiveSet.has(mem.id)) return;
@@ -356,40 +373,12 @@ function draw() {
         if (mem.cooldown > 0) mem.cooldown--;
       });
       tickOverlap(R, t);
-      push(); rotateX(curRotX); rotateY(curRotY);
-      if (activeOverlap) drawOverlapEffect(R);
-      memories.forEach((mem, mi) => {
-        if (collectiveSet && !collectiveSet.has(mem.id)) return;
-        push();
-        translate(mem.liveCenter.x, mem.liveCenter.y, mem.liveCenter.z);
-        const distAlpha = getDistanceAlpha(mem.liveCenter);
-        if (distAlpha <= 0) { pop(); return; }
-        const spin = t * (0.13 + mi * 0.025);
-        drawMemSphere(R, mem);
-        drawStampSatellite(R, mem, distAlpha);
-        push(); rotateY(spin); rotateX(spin * 0.6);
-        fill(255, 255, 255, 255 * mem.vitality * distAlpha);
-        mem.nodes.forEach(nd => drawGlyph3D(nd, mem.glyphs, mem, mem.vitality * distAlpha));
-        pop(); pop();
-      });
-      pop();
-
-      // Merge progress HUD
-      if (activeOverlap && interactionMode === INTERACTION_MODE.COLLECTIVE) {
-        const prog = min(activeOverlap.frames / MERGE_FRAMES, 1.0);
-        push(); camera(); ortho(-width / 2, width / 2, height / 2, -height / 2, -10, 10);
-        noStroke(); fill(200, 180, 255, 140 * prog);
-        textAlign(CENTER, CENTER); textSize(11); textStyle(NORMAL);
-        const A = memories[activeOverlap.miA], B = memories[activeOverlap.miB];
-        if (A && B) {
-          const label = activeOverlap.hasMerged ? 'merged' : `merging… ${(prog * 100).toFixed(0)}%`;
-          text(label, 0, -height / 2 + 50);
-          textSize(9); fill(180, 170, 230, 100);
-          text(`"${A.sentence}" + "${B.sentence}"`, 0, -height / 2 + 70);
-        }
-        pop();
+      if (window.threeMemoryRenderer) {
+        window.threeMemoryRenderer.renderMemories({
+          memories, R, rotX: curRotX, rotY: curRotY, camZ, leftShift: -width * 0.6,
+          activeOverlap, collectiveSet
+        });
       }
-
       updateMemoryLabels2D();
     }
   }

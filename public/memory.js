@@ -37,19 +37,17 @@ function recalcBases() {
   memories.forEach((mem, mi) => { mem.baseCenter = getBaseCenter(mi, memories.length); });
 }
 
-/** At most MAX_GLYPH_UNITS clusters; extra words are merged into adjacent chunks. */
-function clusterWordsForGlyphs(words) {
-  const clean = words.filter(w => w && String(w).trim().length);
-  if (clean.length <= MAX_GLYPH_UNITS) return clean.map(w => String(w).toUpperCase().trim());
-  const n = clean.length;
+/** Character-driven glyph extraction (letters, numbers, symbols) with cap for perf. */
+function clusterCharsForGlyphs(text) {
+  const src = String(text || '')
+    .split('')
+    .filter(ch => ch.trim().length > 0);
+  if (src.length <= MAX_GLYPH_UNITS) return src;
   const out = [];
-  let idx = 0;
-  for (let c = 0; c < MAX_GLYPH_UNITS; c++) {
-    const remainingSlots = MAX_GLYPH_UNITS - c;
-    const take = Math.ceil((n - idx) / remainingSlots);
-    const part = clean.slice(idx, idx + take);
-    idx += take;
-    out.push(part.join(' ').toUpperCase().replace(/\s+/g, ' ').trim());
+  const last = src.length - 1;
+  for (let i = 0; i < MAX_GLYPH_UNITS; i++) {
+    const idx = Math.round((i / Math.max(MAX_GLYPH_UNITS - 1, 1)) * last);
+    out.push(src[idx]);
   }
   return out;
 }
@@ -81,37 +79,64 @@ function sampleWordCenters3D(count, radius, rng) {
   return centers;
 }
 
+// Place glyph pods on an inner orbital shell for a cohesive medallion look.
+function sampleOrbitalCenters3D(count, radius, rng) {
+  if (count <= 0) return [];
+  const out = [];
+  const golden = Math.PI * (3 - Math.sqrt(5));
+  const squashY = 0.82;
+  const shell = radius * 0.84;
+  for (let i = 0; i < count; i++) {
+    const t = (i + 0.5) / count;
+    const y = 1 - 2 * t;
+    const r = Math.sqrt(Math.max(0, 1 - y * y));
+    const phi = i * golden + (rng() - 0.5) * 0.35;
+    const jitter = shell * 0.08;
+    out.push({
+      x: r * Math.cos(phi) * shell + (rng() - 0.5) * jitter,
+      y: y * shell * squashY + (rng() - 0.5) * jitter * 0.5,
+      z: r * Math.sin(phi) * shell + (rng() - 0.5) * jitter,
+    });
+  }
+  return out;
+}
+
 function rebuildNodes(memIdx) {
   const mem = memories[memIdx];
   if (!mem) return;
-  const sentence = mem.sentence.toUpperCase();
-  const R = getSphereR(), innerR = R * 0.68, spacing = min(width, height) * 0.052;
+  const sentence = mem.sentence || '';
+  const chars = clusterCharsForGlyphs(sentence);
+  if (!chars.length) return;
+  const sphereR = getMemorySphereR(chars.length);
+  const innerR = sphereR * 0.68;
+  const spacing = min(width, height) * 0.04;
   const rng = mulberry32(seedVal + memIdx * 9999 + (mem.mergeCount || 0) * 777);
-  const rawWords = sentence.replace(/[^A-Z ]/g, '').split(' ').filter(w => w.length);
-  if (!rawWords.length) return;
-  const words = clusterWordsForGlyphs(rawWords);
   const nodes = [];
-  const wordCenters = sampleWordCenters3D(words.length, innerR * 0.88, rng);
-  words.forEach((cluster, wi) => {
+  // Scatter glyphs more randomly throughout the inner volume (still spaced apart).
+  const wordCenters = sampleWordCenters3D(chars.length, innerR * 1.75, rng);
+  chars.forEach((charSymbol, wi) => {
     const wc = wordCenters[wi] || { x: 0, y: 0, z: 0 };
-    const letter = cluster.replace(/[^A-Z]/g, '').charAt(0) || 'A';
-    const spread = spacing * (0.65 + min(cluster.length, 28) * 0.045);
-    const jx = (rng() - 0.5) * spread, jy = (rng() - 0.5) * spread, jz = (rng() - 0.5) * spread * 0.6;
-    const ax = cos((wi + 1) * 1.7 + mem.id) * spread * 0.12;
-    const ay = sin((wi + 1) * 1.2 + mem.id) * spread * 0.08;
-    const az = sin((wi + 1) * 1.1 + mem.id + 1.3) * spread * 0.06;
+    const spread = spacing * 0.22;
+    const jx = (rng() - 0.5) * spread * 0.7, jy = (rng() - 0.5) * spread * 0.7, jz = (rng() - 0.5) * spread * 0.8;
+    const ax = cos((wi + 1) * 1.7 + mem.id) * spread * 0.5;
+    const ay = sin((wi + 1) * 1.2 + mem.id) * spread * 0.8;
+    const az = sin((wi + 1) * 1.1 + mem.id + 1.3) * spread * 0.4;
     let px = wc.x + jx + ax, py = wc.y + jy + ay, pz = wc.z + jz + az;
     const len = sqrt(px * px + py * py + pz * pz);
-    if (len > innerR) { const sc = innerR / len; px *= sc; py *= sc; pz *= sc; }
+    if (len > innerR * 1.2) { const sc = innerR / len; px *= sc; py *= sc; pz *= sc; }
+    const nLen = sqrt(px * px + py * py + pz * pz) || 1;
+    const nx = px / nLen, ny = py / nLen, nz = pz / nLen;
     nodes.push({
-      letter, wordIdx: wi, x: px, y: py, z: pz,
-      size: constrain(spacing * 1.25 + (rng() - 0.5) * spacing * 0.35, 24, 100),
-      opacity: 0.78 + rng() * 0.22, tiltX: (rng() - 0.5) * 0.5, tiltY: (rng() - 0.5) * 0.5,
+      charSymbol, wordIdx: wi, x: px, y: py, z: pz,
+      size: constrain(spacing * (2.7 - Math.min(chars.length, 24) * 0.045) + (rng() - 0.5) * spacing * 0.24, 60, 98),
+      opacity: 0.86 + rng() * 0.14, tiltX: (rng() - 0.5) * 0.22, tiltY: (rng() - 0.5) * 0.7,
+      nx, ny, nz,
       glyphIdx: nodes.length, colorPhase: mem.colorPhase,
     });
   });
   mem.nodes = nodes;
-  mem.glyphs = nodes.map((nd, i) => getGlyph(nd.letter, mem.id, i, mem.mergeCount || 0));
+  mem.sphereR = sphereR;
+  mem.glyphs = nodes.map((nd, i) => getGlyph(nd.charSymbol, mem.id, i, mem.mergeCount || 0));
 }
 
 async function addMemory(sentence, anonymous) {
@@ -123,29 +148,32 @@ async function addMemory(sentence, anonymous) {
   const mi = memories.length, id = memIdCounter++;
   const colorPhase = id * 317;
   const rng = mulberry32(seedVal + mi * 9999);
-  const rawWords = sentence.replace(/[^A-Z ]/g, '').split(' ').filter(w => w.length);
-  if (!rawWords.length) return;
-  const words = clusterWordsForGlyphs(rawWords);
-
-  const R = getSphereR(), innerR = R * 0.68, spacing = min(width, height) * 0.052;
+  const chars = clusterCharsForGlyphs(sentence);
+  if (!chars.length) return;
+  const sphereR = getMemorySphereR(chars.length);
+  const innerR = sphereR * 0.68;
+  const spacing = min(width, height) * 0.04;
   const nodes = [];
-  const wordCenters = sampleWordCenters3D(words.length, innerR * 0.88, rng);
-  words.forEach((cluster, wi) => {
+  // Scatter glyphs more randomly throughout the inner volume (still spaced apart).
+  const wordCenters = sampleWordCenters3D(chars.length, innerR * 0.92, rng);
+  chars.forEach((charSymbol, wi) => {
     const wc = wordCenters[wi] || { x: 0, y: 0, z: 0 };
     const wcx = wc.x, wcy = wc.y, wcz = wc.z;
-    const letter = cluster.replace(/[^A-Z]/g, '').charAt(0) || 'A';
-    const spread = spacing * (0.65 + min(cluster.length, 28) * 0.045);
-    const jx = (rng() - 0.5) * spread, jy = (rng() - 0.5) * spread, jz = (rng() - 0.5) * spread * 0.6;
-    const ax = cos((wi + 1) * 1.7 + id) * spread * 0.12;
-    const ay = sin((wi + 1) * 1.2 + id) * spread * 0.08;
+    const spread = spacing * 0.22;
+    const jx = (rng() - 0.5) * spread, jy = (rng() - 0.5) * spread * 0.7, jz = (rng() - 0.5) * spread;
+    const ax = cos((wi + 1) * 1.7 + id) * spread * 0.08;
+    const ay = sin((wi + 1) * 1.2 + id) * spread * 0.06;
     const az = sin((wi + 1) * 1.1 + id + 1.3) * spread * 0.06;
     let px = wcx + jx + ax, py = wcy + jy + ay, pz = wcz + jz + az;
     const len = sqrt(px * px + py * py + pz * pz);
     if (len > innerR) { const sc = innerR / len; px *= sc; py *= sc; pz *= sc; }
+    const nLen = sqrt(px * px + py * py + pz * pz) || 1;
+    const nx = px / nLen, ny = py / nLen, nz = pz / nLen;
     nodes.push({
-      letter, wordIdx: wi, x: px, y: py, z: pz,
-      size: constrain(spacing * 1.25 + (rng() - 0.5) * spacing * 0.35, 24, 100),
-      opacity: 0.78 + rng() * 0.22, tiltX: (rng() - 0.5) * 0.5, tiltY: (rng() - 0.5) * 0.5,
+      charSymbol, wordIdx: wi, x: px, y: py, z: pz,
+      size: constrain(spacing * (2.7 - Math.min(chars.length, 24) * 0.045) + (rng() - 0.5) * spacing * 0.24, 60, 98),
+      opacity: 0.86 + rng() * 0.14, tiltX: (rng() - 0.5) * 0.22, tiltY: (rng() - 0.5) * 0.22,
+      nx, ny, nz,
       glyphIdx: nodes.length, colorPhase,
     });
   });
@@ -156,7 +184,7 @@ async function addMemory(sentence, anonymous) {
     originalSentence: sentence.toLowerCase(),
     isAnonymous: !!anonymous,
     ownerId: currentUser ? currentUser.id : null,
-    nodes, glyphs: nodes.map((nd, i) => getGlyph(nd.letter, id, i, 0)),
+    nodes, sphereR, glyphs: nodes.map((nd, i) => getGlyph(nd.charSymbol, id, i, 0)),
     colorPhase, baseCenter: bc,
     pos: { x: bc.x, y: bc.y, z: bc.z },
     vel: { x: 0, y: 0, z: 0 },
@@ -206,39 +234,43 @@ let previewMemCache = null;
 let previewMemCacheSentence = '';
 
 function buildPreviewMemory(sentence) {
-  const s = (sentence || '').trim().toUpperCase();
+  const s = (sentence || '').trim();
   if (!s) return null;
   if (s === previewMemCacheSentence && previewMemCache) return previewMemCache;
-  const rawWords = s.replace(/[^A-Z ]/g, '').split(' ').filter(w => w.length);
-  if (!rawWords.length) return null;
-  const words = clusterWordsForGlyphs(rawWords);
+  const chars = clusterCharsForGlyphs(s);
+  if (!chars.length) return null;
   const id = -1;
   const colorPhase = 317;
   const rng = mulberry32(seedVal + 99999);
-  const R = 120, innerR = R * 0.68, spacing = min(width, height) * 0.052;
+  const sphereR = getMemorySphereR(chars.length);
+  const innerR = sphereR * 0.68;
+  const spacing = min(width, height) * 0.04;
   const nodes = [];
-  const wordCenters = sampleWordCenters3D(words.length, innerR * 0.88, rng);
-  words.forEach((cluster, wi) => {
+  // Scatter glyphs more randomly throughout the inner volume (still spaced apart).
+  const wordCenters = sampleWordCenters3D(chars.length, innerR * 0.92, rng);
+  chars.forEach((charSymbol, wi) => {
     const wc = wordCenters[wi] || { x: 0, y: 0, z: 0 };
-    const letter = cluster.replace(/[^A-Z]/g, '').charAt(0) || 'A';
-    const spread = spacing * (0.65 + min(cluster.length, 28) * 0.045);
-    const jx = (rng() - 0.5) * spread, jy = (rng() - 0.5) * spread, jz = (rng() - 0.5) * spread * 0.6;
-    const ax = cos((wi + 1) * 1.7 + id) * spread * 0.12;
-    const ay = sin((wi + 1) * 1.2 + id) * spread * 0.08;
+    const spread = spacing * 0.22;
+    const jx = (rng() - 0.5) * spread, jy = (rng() - 0.5) * spread * 0.7, jz = (rng() - 0.5) * spread;
+    const ax = cos((wi + 1) * 1.7 + id) * spread * 0.08;
+    const ay = sin((wi + 1) * 1.2 + id) * spread * 0.06;
     const az = sin((wi + 1) * 1.1 + id + 1.3) * spread * 0.06;
     let px = wc.x + jx + ax, py = wc.y + jy + ay, pz = wc.z + jz + az;
     const len = sqrt(px * px + py * py + pz * pz);
     if (len > innerR) { const sc = innerR / len; px *= sc; py *= sc; pz *= sc; }
+    const nLen = sqrt(px * px + py * py + pz * pz) || 1;
+    const nx = px / nLen, ny = py / nLen, nz = pz / nLen;
     nodes.push({
-      letter, wordIdx: wi, x: px, y: py, z: pz,
-      size: constrain(spacing * 1.25 + (rng() - 0.5) * spacing * 0.35, 24, 100),
-      opacity: 0.78 + rng() * 0.22, tiltX: (rng() - 0.5) * 0.5, tiltY: (rng() - 0.5) * 0.5,
+      charSymbol, wordIdx: wi, x: px, y: py, z: pz,
+      size: constrain(spacing * (2.3 - Math.min(chars.length, 24) * 0.035) + (rng() - 0.5) * spacing * 0.2, 44, 78),
+      opacity: 0.86 + rng() * 0.14, tiltX: (rng() - 0.5) * 0.22, tiltY: (rng() - 0.5) * 0.22,
+      nx, ny, nz,
       glyphIdx: nodes.length, colorPhase
     });
   });
   previewMemCacheSentence = s;
   previewMemCache = {
-    id, sentence: s.toLowerCase(), nodes, glyphs: nodes.map((nd, i) => getGlyph(nd.letter, id, i, 0)),
+    id, sentence: s.toLowerCase(), nodes, sphereR, glyphs: nodes.map((nd, i) => getGlyph(nd.charSymbol, id, i, 0)),
     colorPhase, liveCenter: { x: 0, y: 0, z: 0 }, vitality: 1, morphAmt: 0, morphSeed: 0, mergeCount: 0
   };
   return previewMemCache;

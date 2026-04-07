@@ -68,34 +68,56 @@ function buildOrganicGraph(seed, n) {
   return { nodes, adj, edges };
 }
 
-function getGlyph(letter, memoryId, localIdx, mergeCount) {
-  const h = hash32(`${seedVal}|${memoryId}|${mergeCount}|${localIdx}|${letter}`);
+function normalizeGlyphChar(ch) {
+  const c = String(ch || '').charAt(0);
+  if (!c) return '?';
+  if (/[a-z]/.test(c)) return c.toUpperCase();
+  return c;
+}
+
+function getGlyph(charSymbol, memoryId, localIdx, mergeCount) {
+  const c = normalizeGlyphChar(charSymbol);
+  const h = hash32(`charGlyph|${c}`);
   const variation = h % 3;
-  return generateGlyph(letter, variation, memoryId);
+  return generateGlyph(c, variation, memoryId);
 }
 
-function generateGlyph(letter, variation, memoryId) {
-  const rng = mulberry32(hash32(`${seedVal}|${letter}|${variation}|${memoryId}`));
+function generateGlyph(charSymbol, variation, memoryId) {
+  const rng = mulberry32(hash32(`glyphStable|${charSymbol}|${variation}`));
   if (!glyphGraph) initGlyphGraph();
-  const style = glyphStyle(letter);
-  const rule = glyphRule(letter);
+  const style = glyphStyle(charSymbol);
+  const rule = glyphRule(charSymbol);
   const start = pickStartNode(rule, rng);
-  const anchor = style === 'grid' ? buildGridAnchor(letter, variation, rng) : buildAnchorStroke(rule, variation, rng, letter);
-  const fr = style === 'grid' ? extractGridFragments(letter, variation, rng) : extractFragments(rule, start, variation, rng);
+  const anchor = style === 'grid' ? buildGridAnchor(charSymbol, variation, rng) : buildAnchorStroke(rule, variation, rng, charSymbol);
+  const fr = style === 'grid' ? extractGridFragments(charSymbol, variation, rng) : extractFragments(rule, start, variation, rng);
   const norm = normalizeGlyphSystem(anchor, fr.nodes, fr.edges);
-  return { seed: hash32(`${seedVal}|${letter}|${variation}|${memoryId}`), letter, variation, anchor: norm.anchor, nodes: norm.nodes, edges: norm.edges, style };
+  return {
+    seed: hash32(`glyphStable|${charSymbol}|${variation}`),
+    charSymbol,
+    variation,
+    anchor: norm.anchor,
+    nodes: norm.nodes,
+    edges: norm.edges,
+    style
+  };
 }
 
-function glyphRule(letter) {
-  if (letter === 'A') return 'branching';
-  if (letter === 'B') return 'dense';
-  if (letter === 'C') return 'arc';
-  if (letter === 'D') return 'radial';
+function glyphRule(charSymbol) {
+  const c = normalizeGlyphChar(charSymbol);
+  if (/[0-9]/.test(c)) return 'radial';
+  if (/[A-I]/.test(c)) return 'branching';
+  if (/[J-R]/.test(c)) return 'dense';
+  if (/[S-Z]/.test(c)) return 'arc';
+  if (/[.,;:!?]/.test(c)) return 'arc';
+  if (/[+\-*/=<>]/.test(c)) return 'gridline';
+  if (/[\[\]\(\)\{\}\\|]/.test(c)) return 'radial';
   return 'mixed';
 }
-function glyphStyle(letter) {
-  const h = hash32(`${seedVal}|alphaStyle|${letter}`);
-  return (h % 10) < 7 ? 'grid' : 'organic';
+function glyphStyle(charSymbol) {
+  const c = normalizeGlyphChar(charSymbol);
+  if (/[A-Z]/.test(c)) return (hash32(`glyphStyle|${c}`) % 10) < 6 ? 'organic' : 'grid';
+  if (/[0-9]/.test(c)) return 'grid';
+  return 'organic';
 }
 
 function pickStartNode(rule, rng) {
