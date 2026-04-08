@@ -1,4 +1,4 @@
-// Three.js renderer for memory spheres, glyphs, and stamps.
+// Three.js renderer: glass crystal sphere visuals per memory + glyphs + stamps.
 
 const threeMemoryRenderer = (() => {
   let scene, camera, renderer, rootGroup, voidGroup;
@@ -9,6 +9,9 @@ const threeMemoryRenderer = (() => {
   let nodeGeom = null;
   let glyphSphereGeom = null;
   let linkGeom = null;
+  let crystalShellGeom = null;
+  let coreGlowGeom = null;
+  const sharedGeoms = new Set();
   let threeLoadStarted = false;
   let threeLoadDone = false;
   const glyphTextureCache = new Map();
@@ -20,6 +23,12 @@ const threeMemoryRenderer = (() => {
     [4, 11], [5, 11], [6, 11], [7, 11], [8, 11], [9, 11], [1, 11],
     [5, 3], [7, 3], [7, 4], [9, 4], [7, 5], [9, 5], [11, 5], [11, 7], [11, 9]
   ];
+
+  const SPHERE_RADIUS = 1.1;
+  const GLYPH_ORB_OUTWARD_SCALE = 1.7;
+  const STAMP_ORB_OUTWARD_SCALE = 1.7;
+  let lightningPointMatsThisFrame = [];
+  let stampHaloUpdaters = [];
 
   function loadScriptOnce(src) {
     return new Promise((resolve, reject) => {
@@ -86,6 +95,7 @@ const threeMemoryRenderer = (() => {
     }
     try {
       scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x0d1a3a);
       camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 5000);
       camera.position.set(0, 0, 720);
       sphereGeom = new THREE.SphereGeometry(1, 64, 48);
@@ -93,12 +103,18 @@ const threeMemoryRenderer = (() => {
       nodeGeom = new THREE.SphereGeometry(1, 10, 10);
       glyphSphereGeom = new THREE.SphereGeometry(1, 28, 24);
       linkGeom = new THREE.CylinderGeometry(1, 1, 1, 16, 1, true);
+      crystalShellGeom = new THREE.SphereGeometry(SPHERE_RADIUS, 64, 64);
+      coreGlowGeom = new THREE.SphereGeometry(0.06, 24, 20);
+      sharedGeoms.clear();
+      [sphereGeom, stampGeom, nodeGeom, glyphSphereGeom, linkGeom, crystalShellGeom, coreGlowGeom].forEach((g) => {
+        if (g) sharedGeoms.add(g);
+      });
 
       renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
       renderer.setSize(window.innerWidth, window.innerHeight);
       if ('outputColorSpace' in renderer) renderer.outputColorSpace = THREE.SRGBColorSpace;
-      renderer.setClearColor(0x000000, 0);
+      renderer.setClearColor(0x0d1a3a, 1);
       canvasEl = renderer.domElement;
       canvasEl.style.position = 'absolute';
       canvasEl.style.inset = '0';
@@ -111,10 +127,10 @@ const threeMemoryRenderer = (() => {
       scene.add(rootGroup);
       scene.add(voidGroup);
 
-      const ambient = new THREE.AmbientLight(0xb6c4ff, 0.8);
-      const key = new THREE.DirectionalLight(0xbfcaff, 0.7);
+      const ambient = new THREE.AmbientLight(0xb6c4ff, 0.55);
+      const key = new THREE.DirectionalLight(0xbfcaff, 0.55);
       key.position.set(320, 240, 420);
-      const rim = new THREE.DirectionalLight(0x927dff, 0.45);
+      const rim = new THREE.DirectionalLight(0x927dff, 0.35);
       rim.position.set(-280, -140, -420);
       scene.add(ambient, key, rim);
       initOk = true;
@@ -140,7 +156,8 @@ const threeMemoryRenderer = (() => {
     while (g.children.length) {
       const c = g.children[0];
       g.remove(c);
-      if (c.geometry) c.geometry.dispose?.();
+      clearGroup(c);
+      if (c.geometry && !sharedGeoms.has(c.geometry)) c.geometry.dispose?.();
       if (c.material) {
         if (Array.isArray(c.material)) c.material.forEach(m => m.dispose?.());
         else c.material.dispose?.();
@@ -148,13 +165,20 @@ const threeMemoryRenderer = (() => {
     }
   }
 
-  function memColor(mem) {
-    const p = mem.colorPhase || 0;
-    return {
-      r: Math.min(255, Math.max(0, Math.sin(p * 0.013) * 40 + 180)),
-      g: Math.min(255, Math.max(0, Math.sin(p * 0.021) * 40 + 190)),
-      b: Math.min(255, Math.max(0, Math.sin(p * 0.031) * 40 + 220)),
+  function mulberry32(seed) {
+    let a = seed >>> 0;
+    return () => {
+      a |= 0; a = a + 0x6D2B79F5 | 0;
+      let t = Math.imul(a ^ a >>> 15, 1 | a);
+      t ^= t + Math.imul(t ^ t >>> 7, 61 | t);
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
     };
+  }
+
+  function memRngFromMemory(mem, mi) {
+    const id = (mem && mem.id) || 0;
+    const mc = (mem && mem.mergeCount) || 0;
+    return mulberry32((id * 5023) ^ (mi * 733) ^ (mc * 9109) ^ 0x9e3779b9);
   }
 
   function glyphCfgFromChar(ch) {
@@ -168,10 +192,6 @@ const threeMemoryRenderer = (() => {
     return { a: p[0], b: p[1], delta, rot, hue: (c * 137.508) % 360 };
   }
 
-  /**
-   * Dense “scribble / spirograph” Lissajous stacks: many thin strokes + optional
-   * shadowBlur so overlaps read as neon (matches glyph_sphere-style logic, richer).
-   */
   function drawLissajousBundleNeon(ctx, a, b, delta, rot, hue, nT, spd, rad, cx, cy, opts) {
     const ST = Math.max(480, opts?.steps ?? 960);
     const alphaMul = opts?.alphaMul ?? 1;
@@ -318,9 +338,15 @@ const threeMemoryRenderer = (() => {
     const glyphTexture = createGlyphTexture(nd.charSymbol);
     const shellR = Math.max(1, Number(memR || mem.sphereR || 1));
     const inset = Math.min(shellR * 0.3, (glyphBubbleR * 1.15) + shellR * 0.04);
-    const glyphPos = new THREE.Vector3(nd.x || 0, nd.y || 0, nd.z || 0).addScaledVector(outN, -inset);
+    const nodeVec = new THREE.Vector3(nd.x || 0, nd.y || 0, nd.z || 0);
+    const r0 = nodeVec.length();
+    if (r0 > 1e-6) {
+      const radialDir = nodeVec.clone().normalize();
+      const r1 = Math.min(r0 * GLYPH_ORB_OUTWARD_SCALE, shellR * 0.92);
+      nodeVec.copy(radialDir.multiplyScalar(r1));
+    }
+    const glyphPos = nodeVec.addScaledVector(outN, -inset);
 
-    // Single textured orb: line art reads as dense neon curves, not glossy glass shapes.
     const glyphOrb = new THREE.Mesh(glyphSphereGeom || stampGeom, new THREE.MeshBasicMaterial({
       map: glyphTexture || null,
       color: 0xffffff,
@@ -347,7 +373,8 @@ const threeMemoryRenderer = (() => {
     const len = Math.sqrt(u * u + v * v + w * w) || 1;
     const dir = { x: u / len, y: v / len, z: w / len };
     const satR = R * 0.24;
-    const centerDist = R - satR * 0.48;
+    const rawDist = R - satR * 0.48;
+    const centerDist = Math.min(rawDist * STAMP_ORB_OUTWARD_SCALE, R * 0.91 - satR * 0.35);
     const pos = new THREE.Vector3(dir.x * centerDist, dir.y * centerDist, dir.z * centerDist);
 
     const bubble = new THREE.Mesh(stampGeom, new THREE.MeshPhysicalMaterial({
@@ -364,8 +391,338 @@ const threeMemoryRenderer = (() => {
     group.add(bubble);
   }
 
+  function randomOnSphere(r, rng) {
+    const z = rng() * 2 - 1;
+    const a = rng() * Math.PI * 2;
+    const s = Math.sqrt(Math.max(0, 1 - z * z));
+    return new THREE.Vector3(Math.cos(a) * s * r, Math.sin(a) * s * r, z * r);
+  }
+
+  function rodriguesRotate(v, k, theta) {
+    const cos = Math.cos(theta);
+    const sin = Math.sin(theta);
+    const kv = new THREE.Vector3().crossVectors(k, v);
+    return v.clone().multiplyScalar(cos)
+      .add(kv.multiplyScalar(sin))
+      .add(k.clone().multiplyScalar(k.dot(v) * (1 - cos)));
+  }
+
+  function randomUnitPerpendicular(n, rng) {
+    let r = new THREE.Vector3(rng() * 2 - 1, rng() * 2 - 1, rng() * 2 - 1);
+    r.sub(n.clone().multiplyScalar(r.dot(n)));
+    if (r.lengthSq() < 1e-8) r = new THREE.Vector3(1, 0, 0).sub(n.clone().multiplyScalar(n.x));
+    return r.normalize();
+  }
+
+  function angularDist(a, b) {
+    const dot = Math.abs(a.dot(b) / (a.length() * b.length()));
+    return Math.acos(Math.min(1, Math.max(-1, dot)));
+  }
+
+  function createShellMaterial(alphaMult) {
+    return new THREE.ShaderMaterial({
+      transparent: true,
+      depthWrite: false,
+      side: THREE.FrontSide,
+      uniforms: {
+        uOpacity: { value: 0.06 },
+        uFresnelPower: { value: 6.2 },
+        uEdgeColor: { value: new THREE.Color(0xc8ddff) },
+        uAlphaMult: { value: Math.min(1, Math.max(0, alphaMult)) }
+      },
+      vertexShader: `
+        varying vec3 vNormalW;
+        varying vec3 vViewDirW;
+        void main() {
+          vec4 worldPos = modelMatrix * vec4(position, 1.0);
+          vNormalW = normalize(mat3(modelMatrix) * normal);
+          vViewDirW = normalize(cameraPosition - worldPos.xyz);
+          gl_Position = projectionMatrix * viewMatrix * worldPos;
+        }
+      `,
+      fragmentShader: `
+        uniform float uOpacity;
+        uniform float uFresnelPower;
+        uniform vec3 uEdgeColor;
+        uniform float uAlphaMult;
+        varying vec3 vNormalW;
+        varying vec3 vViewDirW;
+        void main() {
+          float ndv = clamp(dot(normalize(vNormalW), normalize(vViewDirW)), 0.0, 1.0);
+          float fresnel = pow(1.0 - ndv, uFresnelPower);
+          float fillA = uOpacity;
+          float rimA = fresnel * 0.92;
+          float alpha = (fillA + rimA) * uAlphaMult;
+          vec3 col = uEdgeColor * fresnel;
+          gl_FragColor = vec4(col, alpha);
+        }
+      `
+    });
+  }
+
+  function createCrystalClusterShaderMaterial(alphaMult) {
+    return new THREE.ShaderMaterial({
+      transparent: true,
+      opacity: 0.88,
+      side: THREE.DoubleSide,
+      uniforms: {
+        uAlphaMult: { value: Math.min(1, Math.max(0, alphaMult)) }
+      },
+      vertexShader: `
+        varying vec3 vNormal;
+        void main() {
+          vec4 worldPos = modelMatrix * vec4(position, 1.0);
+          vNormal = normalize(mat3(modelMatrix) * normal);
+          gl_Position = projectionMatrix * viewMatrix * worldPos;
+        }
+      `,
+      fragmentShader: `
+        uniform float uAlphaMult;
+        varying vec3 vNormal;
+        void main() {
+          float facing = dot(vNormal, normalize(vec3(0.5, 1.0, 0.3)));
+          vec3 col = facing > 0.5  ? vec3(0.78, 0.72, 0.48)
+                   : facing > 0.0  ? vec3(0.47, 0.33, 0.80)
+                   : facing > -0.4 ? vec3(0.20, 0.55, 0.70)
+                                   : vec3(0.25, 0.10, 0.55);
+          gl_FragColor = vec4(col, 0.88 * uAlphaMult);
+        }
+      `
+    });
+  }
+
+  function createCrystalCluster(rng, alphaMult) {
+    const cluster = new THREE.Group();
+    const mat = createCrystalClusterShaderMaterial(alphaMult);
+    const count = 10 + Math.floor(rng() * 5);
+    for (let i = 0; i < count; i++) {
+      const rt = 0.01 + rng() * 0.02;
+      const rb = 0.08 + rng() * 0.05;
+      const h = 0.3 + rng() * 0.2;
+      const cGeom = new THREE.CylinderGeometry(rt, rb, h, 6, 1, false);
+      const crystal = new THREE.Mesh(cGeom, mat);
+      const dir = randomOnSphere(1, rng).normalize();
+      crystal.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+      const sx = 0.85 + rng() * 0.3;
+      const sy = 0.85 + rng() * 0.3;
+      const sz = 0.85 + rng() * 0.3;
+      crystal.scale.set(sx, sy, sz);
+      const hEff = h * sy;
+      crystal.position.copy(dir.clone().multiplyScalar(hEff * 0.5));
+      cluster.add(crystal);
+    }
+    return cluster;
+  }
+
+  function createLightningWeb(sphereRadius, rng, t, lightningPointMatsOut) {
+    const g = new THREE.Group();
+    const allPolylines = [];
+    const terminalPoints = [];
+    const rootPaths = 25 + Math.floor(rng() * 11);
+
+    function growBranch(p0, initialTan, maxSeg, depth) {
+      const pts = [p0.clone()];
+      let p = p0.clone();
+      let fwd = initialTan.clone().normalize();
+      const branchEvery = 2 + Math.floor(rng() * 2);
+      let sinceBranch = 0;
+
+      for (let s = 0; s < maxSeg; s++) {
+        const n = p.clone().normalize();
+        let tanStep = fwd.clone();
+        tanStep.sub(n.clone().multiplyScalar(tanStep.dot(n)));
+        if (tanStep.lengthSq() < 1e-8) tanStep = randomUnitPerpendicular(n, rng);
+        tanStep.normalize();
+        const jitter = ((rng() * 40) - 20) * (Math.PI / 180);
+        tanStep = rodriguesRotate(tanStep, n, jitter).normalize();
+        const axis = n.clone().cross(tanStep).normalize();
+        if (axis.lengthSq() < 1e-8) break;
+        const dtheta = 0.08 + rng() * 0.04;
+        p = rodriguesRotate(p, axis, dtheta).normalize().multiplyScalar(sphereRadius);
+        pts.push(p.clone());
+        fwd = tanStep.clone();
+
+        sinceBranch++;
+        if (sinceBranch >= branchEvery && s < maxSeg - 1 && rng() < 0.4 && depth < 8) {
+          sinceBranch = 0;
+          const diverge = (30 + rng() * 15) * (Math.PI / 180);
+          const sign = rng() < 0.5 ? -1 : 1;
+          let tanB = rodriguesRotate(fwd, n, sign * diverge);
+          tanB.sub(n.clone().multiplyScalar(tanB.dot(n)));
+          if (tanB.lengthSq() < 1e-8) tanB = randomUnitPerpendicular(n, rng);
+          tanB.normalize();
+          const brLen = 2 + Math.floor(rng() * 2);
+          growBranch(p.clone(), tanB, brLen, depth + 1);
+        }
+      }
+
+      if (pts.length >= 2) allPolylines.push(pts);
+      terminalPoints.push(p.clone());
+    }
+
+    for (let i = 0; i < rootPaths; i++) {
+      const p0 = randomOnSphere(sphereRadius, rng).normalize().multiplyScalar(sphereRadius);
+      const tan0 = randomUnitPerpendicular(p0.clone().normalize(), rng);
+      const mainSeg = 4 + Math.floor(rng() * 4);
+      growBranch(p0, tan0, mainSeg, 0);
+    }
+
+    allPolylines.forEach((pts) => {
+      const lineGeom = new THREE.BufferGeometry().setFromPoints(pts);
+      const lineMat = new THREE.LineBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.5,
+        depthWrite: false,
+        linewidth: 1
+      });
+      g.add(new THREE.Line(lineGeom, lineMat));
+    });
+
+    const picked = [];
+    const minEpSep = 0.06;
+    for (let i = 0; i < terminalPoints.length; i++) {
+      const ep = terminalPoints[i];
+      let ok = true;
+      for (let j = 0; j < picked.length; j++) {
+        if (angularDist(ep, picked[j]) < minEpSep) { ok = false; break; }
+      }
+      if (ok) picked.push(ep);
+    }
+
+    const pos = new Float32Array(picked.length * 3);
+    const phase = new Float32Array(picked.length);
+    for (let i = 0; i < picked.length; i++) {
+      pos[i * 3] = picked[i].x;
+      pos[i * 3 + 1] = picked[i].y;
+      pos[i * 3 + 2] = picked[i].z;
+      phase[i] = rng() * Math.PI * 2;
+    }
+    const ptGeom = new THREE.BufferGeometry();
+    ptGeom.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    ptGeom.setAttribute('aPhase', new THREE.BufferAttribute(phase, 1));
+
+    const ptMat = new THREE.ShaderMaterial({
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      uniforms: {
+        uTime: { value: t },
+        uPixelRatio: { value: Math.min(window.devicePixelRatio || 1, 2) }
+      },
+      vertexShader: `
+        attribute float aPhase;
+        uniform float uTime;
+        uniform float uPixelRatio;
+        varying float vPulse;
+        void main() {
+          vPulse = 0.75 + 0.25 * sin(3.14159265 * uTime + aPhase);
+          vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+          gl_Position = projectionMatrix * mvPosition;
+          gl_PointSize = 4.0 * uPixelRatio * vPulse;
+        }
+      `,
+      fragmentShader: `
+        varying float vPulse;
+        void main() {
+          vec2 c = gl_PointCoord - vec2(0.5);
+          float r = length(c) * 2.0;
+          if (r > 1.0) discard;
+          float alpha = (1.0 - r) * 0.65 * vPulse;
+          gl_FragColor = vec4(1.0, 1.0, 1.0, alpha);
+        }
+      `
+    });
+    const points = new THREE.Points(ptGeom, ptMat);
+    g.add(points);
+    lightningPointMatsOut.push(ptMat);
+
+    return g;
+  }
+
+  function memEligibleForStampGlow(mem) {
+    return typeof currentUser !== 'undefined' && currentUser
+      && mem && mem.ownerId && currentUser.id && mem.ownerId === currentUser.id
+      && !mem.isAnonymous;
+  }
+
+  function voidRowEligibleForStampGlow(vm) {
+    return typeof currentUser !== 'undefined' && currentUser
+      && vm && vm.user_id && currentUser.id && vm.user_id === currentUser.id
+      && !vm.is_anonymous;
+  }
+
+  function addOwnedStampGlow(grp, radiusApprox, alpha, phase) {
+    const pl = new THREE.PointLight(0xaa88ff, 1.2 * Math.min(1, alpha), 0.6);
+    grp.add(pl);
+    const halo = new THREE.Mesh(
+      new THREE.SphereGeometry(1, 28, 24),
+      new THREE.MeshBasicMaterial({
+        color: 0xe8d8ff,
+        transparent: true,
+        opacity: 0.2,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+      })
+    );
+    halo.scale.setScalar(radiusApprox * 1.3);
+    grp.add(halo);
+    stampHaloUpdaters.push({
+      mat: halo.material,
+      phase: phase || 0,
+      alphaMult: Math.min(1, alpha)
+    });
+  }
+
+  function addMemoryCrystalScene(g, mem, mi, memR, morphAmt, alpha, timeSec) {
+    const rng = memRngFromMemory(mem, mi);
+    const scaleR = memR + (morphAmt || 0) * memR * 0.18;
+    const bundle = new THREE.Group();
+    bundle.scale.setScalar(scaleR / SPHERE_RADIUS);
+
+    const phase = ((mem.id || 0) * 0.173 + mi * 0.091) % 1000;
+
+    const shell = new THREE.Mesh(crystalShellGeom, createShellMaterial(alpha));
+    shell.rotation.y = (timeSec + phase) * 0.02;
+    bundle.add(shell);
+
+    const coreGlow = new THREE.Mesh(
+      coreGlowGeom,
+      new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.9 * alpha,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+      })
+    );
+    bundle.add(coreGlow);
+
+    const crystalGroup = createCrystalCluster(rng, alpha);
+    crystalGroup.rotation.y = (timeSec + phase) * 0.08;
+    crystalGroup.rotation.x = Math.sin((Math.PI * 2 * (timeSec + phase)) / 8.0) * 0.04;
+    bundle.add(crystalGroup);
+
+    const localLightningMats = [];
+    const lightningGroup = createLightningWeb(SPHERE_RADIUS, rng, timeSec + phase * 0.01, localLightningMats);
+    lightningGroup.rotation.y = (timeSec + phase) * 0.02;
+    bundle.add(lightningGroup);
+    localLightningMats.forEach((m) => {
+      lightningPointMatsThisFrame.push(m);
+      if (m.uniforms.uTime) m.uniforms.uTime.value = timeSec;
+    });
+
+    g.add(bundle);
+
+    const corePl = new THREE.PointLight(0xffffff, 3.0 * alpha, Math.max(2, scaleR * 1.8));
+    corePl.position.set(0, 0, 0);
+    g.add(corePl);
+  }
+
   function renderMemories({ memories, R, rotX, rotY, camZ, leftShift = 0, activeOverlap, collectiveSet }) {
     if (!initOk || !renderer || !scene || !camera) return;
+    lightningPointMatsThisFrame = [];
+    stampHaloUpdaters = [];
     clearGroup(rootGroup);
     clearGroup(voidGroup);
 
@@ -377,54 +734,34 @@ const threeMemoryRenderer = (() => {
     camera.position.set(leftShift || 0, 0, 720 + (camZ || 0));
     camera.lookAt(0, 0, 0);
 
-    (memories || []).forEach((mem) => {
+    const timeSec = performance.now() * 0.001;
+
+    (memories || []).forEach((mem, mi) => {
       if (collectiveSet && !collectiveSet.has(mem.id)) return;
       const center = mem.liveCenter || mem.pos || { x: 0, y: 0, z: 0 };
       const alpha = getDistanceAlpha(center);
       if (alpha <= 0) return;
-      const c = memColor(mem);
-      const color = new THREE.Color(c.r / 255, c.g / 255, c.b / 255);
-
-      const g = new THREE.Group();
-      g.position.set(center.x, center.y, center.z);
-      world.add(g);
-
-      const shell = new THREE.Mesh(sphereGeom, new THREE.MeshPhysicalMaterial({
-        color: color.clone().lerp(new THREE.Color(0xfff2cc), 0.35),
-        transparent: true,
-        opacity: Math.min(0.82, 0.42 * alpha),
-        roughness: 0.08,
-        metalness: 0.02,
-        transmission: 1.0,
-        thickness: 1.15,
-        ior: 1.18,
-        clearcoat: 1.0,
-        clearcoatRoughness: 0.02,
-        depthWrite: false,
-      }));
       const memR = mem.sphereR || R;
-      shell.scale.setScalar(memR + (mem.morphAmt || 0) * memR * 0.18);
-      g.add(shell);
 
-      const innerGlow = new THREE.Mesh(sphereGeom, new THREE.MeshBasicMaterial({
-        color: color.clone().lerp(new THREE.Color(0xffe2b2), 0.25),
-        transparent: true,
-        opacity: 0.16 * alpha,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false
-      }));
-      innerGlow.scale.setScalar(memR * 0.96);
-      g.add(innerGlow);
+      const grp = new THREE.Group();
+      grp.position.set(center.x, center.y, center.z);
+      world.add(grp);
 
-      const wire = new THREE.LineSegments(
-        new THREE.EdgesGeometry(sphereGeom, 20),
-        new THREE.LineBasicMaterial({ color: 0xfff3da, transparent: true, opacity: 0.06 * alpha })
-      );
-      wire.scale.copy(shell.scale);
-      g.add(wire);
+      addMemoryCrystalScene(grp, mem, mi, memR, mem.morphAmt, alpha, timeSec);
+      addStamp(grp, mem, memR, alpha);
+      (mem.nodes || []).forEach((nd) => addGlyph(grp, nd, mem.glyphs && mem.glyphs[nd.glyphIdx], mem, alpha, memR));
+      if (memEligibleForStampGlow(mem)) {
+        const scaleR = memR + (mem.morphAmt || 0) * memR * 0.18;
+        const glowPhase = ((mem.id || 0) * 0.413 + mi * 0.27) % 62.83;
+        addOwnedStampGlow(grp, scaleR, alpha, glowPhase);
+      }
+    });
 
-      addStamp(g, mem, memR, alpha);
-      (mem.nodes || []).forEach((nd) => addGlyph(g, nd, mem.glyphs && mem.glyphs[nd.glyphIdx], mem, alpha, memR));
+    lightningPointMatsThisFrame.forEach((m) => {
+      if (m.uniforms.uTime) m.uniforms.uTime.value = timeSec;
+    });
+    stampHaloUpdaters.forEach(({ mat, phase, alphaMult }) => {
+      mat.opacity = (0.2 + 0.1 * Math.sin(timeSec * 2.0 + phase)) * alphaMult;
     });
 
     if (activeOverlap) {
@@ -473,11 +810,13 @@ const threeMemoryRenderer = (() => {
 
   function renderVoidMemories(voidMemories, t, width, height) {
     if (!initOk || !renderer || !scene || !camera) return;
+    stampHaloUpdaters = [];
     clearGroup(rootGroup);
     clearGroup(voidGroup);
     camera.position.set(0, 0, 760);
     camera.lookAt(0, 0, 0);
 
+    const timeSec = performance.now() * 0.001;
     const count = Math.min((voidMemories || []).length, 20);
     const orbitR = Math.min(width, height) * 0.25;
     for (let i = 0; i < count; i++) {
@@ -487,15 +826,28 @@ const threeMemoryRenderer = (() => {
       const y = orbitR * Math.sin(theta) * Math.sin(phi) * 0.5;
       const z = orbitR * Math.cos(theta) * 0.6;
       const size = 14 + 8 * Math.sin(t * 2 + i);
+      const vm = voidMemories[i];
+      const holder = new THREE.Group();
+      holder.position.set(x, y, z);
       const orb = new THREE.Mesh(nodeGeom, new THREE.MeshBasicMaterial({
         color: new THREE.Color((140 + i * 7) / 255, (170 + i * 4) / 255, (255 - i * 2) / 255),
         transparent: true,
         opacity: 0.55,
       }));
-      orb.position.set(x, y, z);
       orb.scale.setScalar(size);
-      voidGroup.add(orb);
+      holder.add(orb);
+      if (vm && voidRowEligibleForStampGlow(vm)) {
+        let hid = 0;
+        const sid = String(vm.id || '');
+        for (let k = 0; k < sid.length; k++) hid = (hid * 33 + sid.charCodeAt(k)) >>> 0;
+        const gph = (hid * 0.001 + i * 0.37) % 62.83;
+        addOwnedStampGlow(holder, size, 1, gph);
+      }
+      voidGroup.add(holder);
     }
+    stampHaloUpdaters.forEach(({ mat, phase, alphaMult }) => {
+      mat.opacity = (0.2 + 0.1 * Math.sin(timeSec * 2.0 + phase)) * alphaMult;
+    });
     renderer.render(scene, camera);
   }
 
@@ -511,6 +863,10 @@ const threeMemoryRenderer = (() => {
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
     renderer.setSize(w, h);
+    const pr = Math.min(window.devicePixelRatio || 1, 2);
+    lightningPointMatsThisFrame.forEach((m) => {
+      if (m.uniforms && m.uniforms.uPixelRatio) m.uniforms.uPixelRatio.value = pr;
+    });
   }
 
   return { init, isReady, resize, clear, renderMemories, renderVoidMemories };
