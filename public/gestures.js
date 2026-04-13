@@ -19,10 +19,19 @@ let pinchOrbPrev = null;
 let twoHandPinchPrevDist = null;
 let lastOpenHandAt = 0;
 
+function setGestureTutorialStep(step) {
+  const step1 = document.getElementById('gestureTutorialStep1');
+  const step2 = document.getElementById('gestureTutorialStep2');
+  if (!step1 || !step2) return;
+  step1.classList.toggle('is-active', step !== 2);
+  step2.classList.toggle('is-active', step === 2);
+}
+
 function showGestureTutorial() {
   if (gestureTutorialShown || !gestureTutorialPending) return;
   gestureTutorialShown = true;
   gestureTutorialPending = false;
+  setGestureTutorialStep(1);
   const el = document.getElementById('gestureTutorial');
   if (el) el.style.display = 'flex';
 }
@@ -30,6 +39,7 @@ function showGestureTutorial() {
 function hideGestureTutorial() {
   const el = document.getElementById('gestureTutorial');
   if (el) el.style.display = 'none';
+  setGestureTutorialStep(1);
 }
 
 let handsResults = [];

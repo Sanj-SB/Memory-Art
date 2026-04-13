@@ -246,6 +246,12 @@ function setup() {
   });
 
   const enableGesturesBtn = document.getElementById('enableGesturesBtn');
+  const gestureTutorialNextBtn = document.getElementById('gestureTutorialNextBtn');
+  if (gestureTutorialNextBtn) {
+    gestureTutorialNextBtn.addEventListener('click', () => {
+      if (typeof setGestureTutorialStep === 'function') setGestureTutorialStep(2);
+    });
+  }
   if (enableGesturesBtn) enableGesturesBtn.addEventListener('click', () => { hideGestureTutorial(); initHandpose(); });
   const skipGesturesBtn = document.getElementById('skipGesturesBtn');
   if (skipGesturesBtn) skipGesturesBtn.addEventListener('click', hideGestureTutorial);

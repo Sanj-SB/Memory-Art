@@ -453,8 +453,182 @@
     .auth-error { position:absolute; bottom:120px; left:50%; transform:translateX(-50%); color:#f88; font-size:11px; }
 
     #gestureTutorial { pointer-events:auto; }
-    .gesture-title { font-size:14px; letter-spacing:0.2em; text-transform:uppercase; color:var(--dim); }
-    .gesture-desc { font-size:11px; color:rgba(150,165,210,0.7); text-align:center; max-width:320px; }
+    .gesture-wizard {
+      width: min(760px, 92vw);
+      background: rgba(10, 14, 32, 0.92);
+      border: 1px solid rgba(170, 180, 235, 0.28);
+      padding: 26px 24px;
+      color: #fff;
+    }
+    .gesture-step { display: none; }
+    .gesture-step.is-active { display: block; }
+    .gesture-head {
+      text-align: center;
+      font-size: 16px;
+      font-family: 'Inter', sans-serif;
+      letter-spacing: 0.01em;
+      line-height: 1.55;
+      color: rgba(240, 244, 255, 0.95);
+      margin-top: 0;
+    }
+    .gesture-subhead {
+      margin-top: 14px;
+      text-align: center;
+      font-size: 16px;
+      font-family: 'Inter', sans-serif;
+      letter-spacing: 0.01em;
+      line-height: 1.55;
+      color: rgba(240, 244, 255, 0.95);
+    }
+    .gesture-intro {
+      margin-top: 26px;
+      text-align: center;
+      font-size: 20px;
+      font-family: 'Cormorant Garamond', serif;
+      letter-spacing: 0.02em;
+      line-height: 1.2;
+      color: rgba(245, 245, 255, 0.96);
+    }
+    .gesture-grid {
+      margin-top: 24px;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 18px;
+    }
+    .gesture-col {
+      border-left: 1px solid rgba(170, 180, 235, 0.34);
+      padding-left: 18px;
+      min-height: 126px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      align-items: center;
+      text-align: center;
+    }
+    .gesture-col:first-child {
+      border-left: none;
+      padding-left: 0;
+    }
+    .gesture-mode {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 18px;
+      color: rgba(245, 245, 255, 0.95);
+      letter-spacing: 0.03em;
+      margin-bottom: 10px;
+    }
+    .gesture-copy {
+      font-size: 15px;
+      line-height: 1.34;
+      color: rgba(236, 236, 249, 0.95);
+      font-family: 'Inter', sans-serif;
+      font-weight: 400;
+    }
+    .gesture-footer-copy {
+      margin-top: 26px;
+      text-align: center;
+      font-size: 16px;
+      line-height: 1.45;
+      color: rgba(236, 236, 249, 0.95);
+      font-family: 'Inter', sans-serif;
+      font-weight: 400;
+    }
+    .gesture-cta {
+      margin-top: 14px;
+      display: flex;
+      justify-content: center;
+    }
+    .gesture-next {
+      min-width: 102px;
+      text-transform: lowercase;
+      letter-spacing: 0.04em;
+      font-size: 18px;
+      font-family: 'Inter', sans-serif;
+      border: 1px solid rgba(170, 180, 235, 0.45);
+      color: rgba(245, 245, 255, 0.95);
+      background: transparent;
+      padding: 8px 20px;
+      cursor: pointer;
+    }
+    .gesture-how {
+      text-align: center;
+      font-size: 41px;
+      font-family: 'Inter', sans-serif;
+      font-weight: 400;
+      line-height: 1.2;
+      color: rgba(245, 245, 255, 0.95);
+      margin-top: 0;
+    }
+    .gesture-how-copy {
+      margin-top: 12px;
+      text-align: center;
+      font-size: 15px;
+      line-height: 1.45;
+      color: rgba(236, 236, 249, 0.95);
+      font-family: 'Inter', sans-serif;
+      font-weight: 400;
+    }
+    .gesture-row-title {
+      margin-top: 24px;
+      text-align: center;
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 28px;
+      letter-spacing: 0.03em;
+      color: rgba(245, 245, 255, 0.95);
+    }
+    .gesture-control-grid {
+      margin-top: 10px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+    }
+    .gesture-control-card {
+      border-left: 1px solid rgba(170, 180, 235, 0.34);
+      padding-left: 18px;
+      min-height: 126px;
+      display: flex;
+      align-items: center;
+      flex-direction: column;
+      justify-content: flex-start;
+    }
+    .gesture-control-card:first-child {
+      border-left: none;
+      padding-left: 0;
+    }
+    .gesture-control-text {
+      font-size: 15px;
+      line-height: 1.34;
+      color: rgba(236, 236, 249, 0.95);
+      font-family: 'Inter', sans-serif;
+      font-weight: 400;
+      text-align: center;
+      width: 100%;
+    }
+    .gesture-illu {
+      width: 100%;
+      max-width: 160px;
+      height: 78px;
+      object-fit: contain;
+      margin: 0 auto 10px;
+      display: block;
+    }
+    .gesture-illu--mode {
+      max-width: 140px;
+      height: 96px;
+      margin-bottom: 8px;
+    }
+    .gesture-actions-row {
+      margin-top: 18px;
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+    .gesture-actions-row .flow-btn {
+      min-width: 128px;
+      letter-spacing: 0.03em;
+      text-transform: lowercase;
+      padding: 10px 16px;
+    }
 
     #handVideo { position:fixed; bottom:90px; left:24px; width:120px; height:90px; object-fit:cover; border-radius:4px; border:1px solid rgba(150,165,210,0.2); z-index:14; }
 
@@ -1169,13 +1343,66 @@
   </div>
 
   <div id="gestureTutorial" class="popup-overlay" style="z-index:32;">
-    <div class="popup-card">
-      <p class="popup-title">CONTROL IN YOUR HANDS</p>
-      <p class="popup-body">In the future, gestures will let you select which memory version you live.<br/>Today, we practice.<br/><br/>Pinch thumb and index together and move your hand left/right and up/down to orbit the memories—the same motion as dragging with the mouse.<br/><br/>Use both hands: pinch thumb and index on each hand, then move your hands apart to zoom in and bring them together to zoom out.<br/><br/>Index, middle, and little finger up (ring finger down) → RECALL - Let the void stimulate biological recall, where each time you remember, you rewrite the memory ever so slightly.<br/><br/>Open hand (all four fingers up), then the rock sign (index and little finger up, middle and ring down) → COLLECTIVE - Watch your memory interact with others' memories, evolve and get morphed. Do the rock within a couple of seconds of the open hand.<br/><br/>Closed palm (fingers folded) → RAW - Your authentic memory; use this when you start feeling lost in all the changes and want to find yourself.</p>
-      <div class="popup-actions">
-        <button class="flow-btn" id="enableGesturesBtn">Try gesture recognition - enable camera</button>
-        <button class="flow-btn flow-btn-muted" id="skipGesturesBtn">Use buttons</button>
-      </div>
+    <div class="gesture-wizard">
+      <section id="gestureTutorialStep1" class="gesture-step is-active">
+        <p class="gesture-head">Imorian technology allows you to decide what memory you view</p>
+        <p class="gesture-subhead">Your memory exists here in 3 possible forms</p>
+        <div class="gesture-grid">
+          <div class="gesture-col">
+            <h3 class="gesture-mode">RAW</h3>
+            <p class="gesture-copy">Your memory in its original form as you entered it</p>
+          </div>
+          <div class="gesture-col">
+            <h3 class="gesture-mode">RECALL</h3>
+            <p class="gesture-copy">Your memory mildly altered each time, as your brain biologically would</p>
+          </div>
+          <div class="gesture-col">
+            <h3 class="gesture-mode">COLLECTIVE</h3>
+            <p class="gesture-copy">Your memory altered based on its interactions with other memories in the void</p>
+          </div>
+        </div>
+        <p class="gesture-footer-copy">Remember - the void has memories entered by other imorians too. We don't want to disconnect you.</p>
+        <p class="gesture-intro">We put the control in<br/>YOUR HANDS</p>
+        <div class="gesture-cta">
+          <button type="button" class="gesture-next" id="gestureTutorialNextBtn">next</button>
+        </div>
+      </section>
+      <section id="gestureTutorialStep2" class="gesture-step">
+        <p class="gesture-how">How does it work?</p>
+        <p class="gesture-how-copy">Once you allow camera access, the void works based on YOUR hand gestures</p>
+        <div class="gesture-grid">
+          <div class="gesture-col">
+            <h3 class="gesture-mode">RAW</h3>
+            <img src="assets/raw.svg" alt="Raw gesture" class="gesture-illu gesture-illu--mode"/>
+            <p class="gesture-copy">a closed fist</p>
+          </div>
+          <div class="gesture-col">
+            <h3 class="gesture-mode">RECALL</h3>
+            <img src="assets/recall.svg" alt="Recall gesture" class="gesture-illu gesture-illu--mode"/>
+            <p class="gesture-copy">touch your ring and thumb</p>
+          </div>
+          <div class="gesture-col">
+            <h3 class="gesture-mode">COLLECTIVE</h3>
+            <img src="assets/collective.svg" alt="Collective gesture" class="gesture-illu gesture-illu--mode"/>
+            <p class="gesture-copy">open palm and then rock</p>
+          </div>
+        </div>
+        <p class="gesture-row-title">VOID CONTROL</p>
+        <div class="gesture-control-grid">
+          <div class="gesture-control-card">
+            <img src="assets/rotate.svg" alt="Rotate control" class="gesture-illu"/>
+            <p class="gesture-control-text">pinch your thumb and index to rotate the memory</p>
+          </div>
+          <div class="gesture-control-card">
+            <img src="assets/zoom-in-and-out.svg" alt="Zoom control" class="gesture-illu"/>
+            <p class="gesture-control-text">use both hands together to zoom in and out</p>
+          </div>
+        </div>
+        <div class="gesture-actions-row">
+          <button class="flow-btn" id="enableGesturesBtn">gesture control</button>
+          <button class="flow-btn flow-btn-muted" id="skipGesturesBtn">use buttons</button>
+        </div>
+      </section>
     </div>
   </div>
 
