@@ -3,6 +3,10 @@
 function switchMode(m) {
   const prevMode = interactionMode;
   console.log(`[DEBUG:MODE] switchMode called: "${prevMode}" → "${m}"`);
+  if (prevMode === INTERACTION_MODE.COLLECTIVE && m !== 'collective' &&
+      typeof clearCollectiveMergeCallouts === 'function') {
+    clearCollectiveMergeCallouts();
+  }
   if (prevMode === INTERACTION_MODE.RECALL && m !== 'recall') {
     console.log(`[DEBUG:MODE] Leaving RECALL — restoring original sentences`);
     memories.forEach((mem, i) => {
@@ -46,11 +50,12 @@ function switchMode(m) {
     b.classList.remove('active');
     if (b.dataset.mode === m) b.classList.add('active');
   });
-  if (m === 'raw' || m === 'recall') {
+  if (m === 'recall') {
     openTimeline();
   } else {
     closeTimeline();
   }
+  if (typeof updateRawMemoryHud === 'function') updateRawMemoryHud();
 }
 
 function applyGestureMode(gesture) {
@@ -98,8 +103,10 @@ function updateFlowUI() {
   const ia = document.getElementById('inputArea');
   const utils = document.getElementById('utils');
   const title = document.getElementById('title');
-  const introOverlay = document.getElementById('introOverlay');
-  const voidEnter = document.getElementById('voidEnter');
+  const landingScreen = document.getElementById('landingScreen');
+  const authChoiceScreen = document.getElementById('authChoiceScreen');
+  const memoryEntryScreen = document.getElementById('memoryEntryScreen');
+  const onboardingTicker = document.getElementById('onboardingTicker');
   const previewActions = document.getElementById('previewActions');
   const modeSwitcher = document.getElementById('modeSwitcher');
   const finalActions = document.getElementById('finalActions');
@@ -111,6 +118,7 @@ function updateFlowUI() {
   if (!ia) return;
 
   const show = (el, v) => { if (el) el.style.display = v ? '' : 'none'; };
+  const showFlex = (el, v) => { if (el) el.style.display = v ? 'flex' : 'none'; };
 
   const canvasContainer = document.getElementById('canvas-container');
   if (canvasContainer) {
@@ -119,68 +127,118 @@ function updateFlowUI() {
       appState === APP_STATE.INTERACT ||
       appState === APP_STATE.FINAL;
     canvasContainer.style.pointerEvents = needsCanvasInput ? 'auto' : 'none';
+    const flatOnboarding =
+      appState === APP_STATE.VOID || appState === APP_STATE.LOGIN;
+    canvasContainer.classList.toggle('canvas-onboarding-flat', flatOnboarding);
   }
 
   const skipBtn = document.getElementById('skipToVoidBtn');
   show(loginOverlay, false);
   show(symbolOverlay, false);
   show(symbolDone, false);
-  show(voidEnter, false);
+  showFlex(authChoiceScreen, false);
+  showFlex(landingScreen, false);
+  showFlex(memoryEntryScreen, false);
   show(previewActions, false);
   show(modeSwitcher, false);
   show(finalActions, false);
   show(focusNav, false);
   show(poolCounter, false);
   show(skipBtn, false);
+  const interactBottomWrapReset = document.getElementById('interactBottomWrap');
+  if (interactBottomWrapReset) interactBottomWrapReset.style.display = 'none';
+  const rawHudReset = document.getElementById('rawMemoryHud');
+  if (rawHudReset) rawHudReset.style.display = 'none';
+  const modeBannerReset = document.getElementById('interactModeBanner');
+  if (modeBannerReset) modeBannerReset.style.display = 'none';
+  if (onboardingTicker) onboardingTicker.style.display = 'none';
   if (handVideo) handVideo.style.display = 'none';
 
   if (appState === APP_STATE.VOID) {
-    show(ia, false); show(utils, false); show(title, true);
-    if (voidEnter) voidEnter.style.display = 'flex';
-    if (introOverlay) introOverlay.style.display = introPopupDismissed ? 'none' : 'flex';
+    show(ia, false); show(utils, false); show(title, false);
+    if (onboardingTicker) onboardingTicker.style.display = 'block';
+    if (!introPopupDismissed) {
+      showFlex(landingScreen, true);
+    } else {
+      showFlex(authChoiceScreen, true);
+    }
     setStatus(currentUser ? 'the void · logged in' : 'the void');
   } else if (appState === APP_STATE.LOGIN) {
     show(ia, false); show(utils, false); show(title, false);
-    if (introOverlay) introOverlay.style.display = 'none';
+    if (onboardingTicker) onboardingTicker.style.display = 'block';
     if (loginOverlay) loginOverlay.style.display = 'flex';
     setStatus('login');
   } else if (appState === APP_STATE.SYMBOL) {
     show(ia, false); show(utils, false); show(title, false);
-    if (introOverlay) introOverlay.style.display = 'none';
     show(symbolOverlay, true);
     if (symbolDone) symbolDone.style.display = 'flex';
     setStatus('draw your identity symbol');
   } else if (appState === APP_STATE.CREATE || appState === APP_STATE.INTERACT) {
     if (appState === APP_STATE.INTERACT && memories.length > 0 && !gestureTutorialShown && gestureTutorialPending) showGestureTutorial();
-    if (introOverlay) introOverlay.style.display = 'none';
+    showFlex(memoryEntryScreen, appState === APP_STATE.CREATE);
     show(ia, appState === APP_STATE.CREATE);
     show(utils, appState === APP_STATE.INTERACT);
-    show(title, true);
+    show(title, appState === APP_STATE.INTERACT);
     show(skipBtn, appState === APP_STATE.CREATE);
     show(modeSwitcher, appState === APP_STATE.INTERACT && memories.length > 0);
     show(poolCounter, appState === APP_STATE.INTERACT);
     const ownedCount = getOwnedIndices().length;
     const showFocusNav = appState === APP_STATE.INTERACT && ownedCount > 1 &&
       (interactionMode === INTERACTION_MODE.RAW || interactionMode === INTERACTION_MODE.RECALL);
+    const interactBottomWrap = document.getElementById('interactBottomWrap');
+    if (interactBottomWrap) {
+      const showWrap = appState === APP_STATE.INTERACT && memories.length > 0 &&
+        (interactionMode === INTERACTION_MODE.RAW || interactionMode === INTERACTION_MODE.RECALL);
+      interactBottomWrap.style.display = showWrap ? 'flex' : 'none';
+      interactBottomWrap.classList.toggle('interact-bottom-wrap--raw', showWrap && interactionMode === INTERACTION_MODE.RAW);
+      interactBottomWrap.classList.toggle('interact-bottom-wrap--recall', showWrap && interactionMode === INTERACTION_MODE.RECALL);
+    }
     if (focusNav) focusNav.style.display = showFocusNav ? 'flex' : 'none';
+    const rawHud = document.getElementById('rawMemoryHud');
+    if (rawHud) {
+      const showRawHud = appState === APP_STATE.INTERACT && interactionMode === INTERACTION_MODE.RAW;
+      rawHud.style.display = showRawHud ? 'block' : 'none';
+    }
+    if (typeof updateRawMemoryHud === 'function') updateRawMemoryHud();
+    const modeBanner = document.getElementById('interactModeBanner');
+    if (modeBanner) {
+      const showBanner = appState === APP_STATE.INTERACT && memories.length > 0 &&
+        (interactionMode === INTERACTION_MODE.RAW || interactionMode === INTERACTION_MODE.COLLECTIVE);
+      modeBanner.style.display = showBanner ? 'block' : 'none';
+      if (showBanner) {
+        modeBanner.textContent = interactionMode === INTERACTION_MODE.RAW ? 'MODE: RAW' : 'MODE: COLLECTIVE';
+      }
+    }
     const toFinalBtn = document.getElementById('toFinalBtn');
     if (toFinalBtn) toFinalBtn.style.display = 'none';
     setStatus(appState === APP_STATE.CREATE ? 'add memories' : `${memories.length} memor${memories.length !== 1 ? 'ies' : 'y'}`);
   } else if (appState === APP_STATE.PREVIEW) {
     show(ia, false); show(utils, false); show(title, false);
-    if (introOverlay) introOverlay.style.display = 'none';
     show(previewActions, true);
     setStatus('preview');
   } else if (appState === APP_STATE.FINAL) {
     show(ia, false); show(utils, true); show(title, true);
-    if (introOverlay) introOverlay.style.display = 'none';
     show(modeSwitcher, true); show(finalActions, true);
     show(poolCounter, true);
     const toFinalBtn = document.getElementById('toFinalBtn');
     if (toFinalBtn) toFinalBtn.style.display = 'none';
     setStatus('final artifact');
   }
+  if (appState !== APP_STATE.INTERACT || interactionMode !== INTERACTION_MODE.COLLECTIVE) {
+    if (typeof clearCollectiveMergeCallouts === 'function') clearCollectiveMergeCallouts();
+  }
   refreshPoolCounter();
+  /* Landing + auth choice both use the same wispy hero (see landing-wispy-bg.js). */
+  const voidOnboardingBg = appState === APP_STATE.VOID;
+  const lwb = window.landingWispyBg;
+  if (lwb) {
+    if (voidOnboardingBg) {
+      lwb.start();
+      requestAnimationFrame(() => lwb.syncSize());
+    } else {
+      lwb.stop();
+    }
+  }
 }
 
 // Symbol drawing

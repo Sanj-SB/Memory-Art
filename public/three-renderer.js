@@ -29,6 +29,8 @@ const threeMemoryRenderer = (() => {
   const STAMP_ORB_OUTWARD_SCALE = 1.7;
   let lightningPointMatsThisFrame = [];
   let stampHaloUpdaters = [];
+  let projHelperWorld = null;
+  let projHelperChild = null;
 
   function loadScriptOnce(src) {
     return new Promise((resolve, reject) => {
@@ -858,6 +860,38 @@ const threeMemoryRenderer = (() => {
     renderer.render(scene, camera);
   }
 
+  function ensureProjHelpers() {
+    if (projHelperWorld) return;
+    projHelperWorld = new THREE.Group();
+    projHelperChild = new THREE.Group();
+    projHelperWorld.add(projHelperChild);
+  }
+
+  /** Screen position (client coords) of a memory center; matches renderMemories camera + world rotation. */
+  function projectSphereCenterToScreen(center, rotX, rotY, camZ, leftShift) {
+    if (!initOk || !camera || !renderer || !center) return null;
+    ensureProjHelpers();
+    camera.position.set(leftShift || 0, 0, 720 + (camZ || 0));
+    camera.lookAt(0, 0, 0);
+    camera.updateProjectionMatrix();
+    camera.updateMatrixWorld(true);
+    projHelperWorld.rotation.set(rotX || 0, rotY || 0, 0);
+    projHelperChild.position.set(center.x, center.y, center.z);
+    projHelperWorld.updateMatrixWorld(true);
+    projHelperChild.updateMatrixWorld(true);
+    const wp = new THREE.Vector3();
+    projHelperChild.getWorldPosition(wp);
+    wp.project(camera);
+    const canvas = renderer.domElement;
+    const rect = canvas.getBoundingClientRect();
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
+    const sx = rect.left + (wp.x * 0.5 + 0.5) * w;
+    const sy = rect.top + (-wp.y * 0.5 + 0.5) * h;
+    const onScreen = wp.z > -1 && wp.z < 1;
+    return { sx, sy, onScreen, ndcZ: wp.z };
+  }
+
   function resize(w, h) {
     if (!initOk || !renderer || !camera) return;
     camera.aspect = w / h;
@@ -869,7 +903,7 @@ const threeMemoryRenderer = (() => {
     });
   }
 
-  return { init, isReady, resize, clear, renderMemories, renderVoidMemories };
+  return { init, isReady, resize, clear, renderMemories, renderVoidMemories, projectSphereCenterToScreen };
 })();
 
 if (typeof window !== 'undefined') {

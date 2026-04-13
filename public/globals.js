@@ -128,6 +128,21 @@ function formatTimeAgo(ts) {
   return `${Math.floor(diff / 3600000)}h ago`;
 }
 
+/** Uppercase line for RAW mode HUD, e.g. "BORN 18S AGO". */
+function formatBornAgo(ts) {
+  const diff = Date.now() - ts;
+  if (diff < 1500) return 'BORN JUST NOW';
+  if (diff < 60000) return `BORN ${Math.floor(diff / 1000)}S AGO`;
+  if (diff < 3600000) return `BORN ${Math.floor(diff / 60000)}M AGO`;
+  return `BORN ${Math.floor(diff / 3600000)}H AGO`;
+}
+
+function getMemoryBirthTime(mem) {
+  if (!mem || !mem.timeline || !mem.timeline.length) return Date.now();
+  const created = mem.timeline.find((e) => e.type === 'created');
+  return (created && created.time) || mem.timeline[0].time || Date.now();
+}
+
 function mulberry32(seed) {
   let s = seed;
   return function () {

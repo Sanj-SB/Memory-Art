@@ -4,7 +4,7 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Imoria</title>
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=Inter:wght@300;400&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=Inter:wght@300;400&family=Playfair+Display:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet"/>
   <script src="https://cdn.jsdelivr.net/npm/p5@1.11.3/lib/p5.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.183.2/build/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js"></script>
@@ -43,6 +43,10 @@
         radial-gradient(ellipse 100% 80% at 65% 22%, rgba(140, 175, 255, 0.14), transparent 58%),
         radial-gradient(ellipse 70% 90% at 18% 75%, rgba(90, 60, 140, 0.1), transparent 55%);
     }
+    /* Solid underlay while landing/auth/login HTML is shown (p5 canvas is transparent). */
+    #canvas-container.canvas-onboarding-flat {
+      background: #060A19;
+    }
 
     #title {
       position: fixed;
@@ -54,17 +58,18 @@
       font-family: 'Cormorant Garamond', serif;
       font-weight: 300;
       font-size: 13px;
-      letter-spacing: 0.28em;
+      letter-spacing: 0.32em;
       text-transform: uppercase;
-      color: var(--dim);
+      color: rgba(255, 255, 255, 0.55);
     }
     #title p {
-      margin-top: 5px;
-      font-size: 10px;
-      letter-spacing: 0.14em;
-      color: rgba(150,165,210,0.25);
-      max-width: 240px;
-      line-height: 1.7;
+      margin-top: 8px;
+      font-size: 11px;
+      font-weight: 300;
+      letter-spacing: 0.06em;
+      color: rgba(255, 255, 255, 0.55);
+      max-width: 280px;
+      line-height: 1.65;
     }
 
     #inputArea {
@@ -181,7 +186,7 @@
     }
 
     #loadingOverlay {
-      position: fixed; inset: 0; z-index: 50;
+      position: fixed; inset: 0; z-index: 60;
       display: flex; flex-direction: column;
       align-items: center; justify-content: center; gap: 16px;
       background: var(--bg);
@@ -211,6 +216,160 @@
     .flow-btn-muted:hover { border-color: rgba(150, 165, 210, 0.45); }
 
     .flow-actions { position:fixed; bottom:80px; left:50%; transform:translateX(-50%); z-index:12; display:flex; gap:24px; }
+
+    /* Interact: prev/next + RAW memory line (no side panel in RAW) */
+    .interact-bottom-wrap {
+      position: fixed;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 22;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 18px;
+      width: min(92vw, 760px);
+      pointer-events: none;
+    }
+    .interact-bottom-wrap.interact-bottom-wrap--raw { bottom: 52px; }
+    .interact-bottom-wrap.interact-bottom-wrap--recall { bottom: 108px; }
+    .interact-bottom-nav {
+      position: static !important;
+      left: auto !important;
+      bottom: auto !important;
+      transform: none !important;
+      display: flex;
+      gap: 20px;
+      pointer-events: auto;
+    }
+    .interact-bottom-nav .flow-btn {
+      border: 1px solid rgba(175, 190, 235, 0.38);
+      color: rgba(215, 225, 250, 0.88);
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      padding: 9px 22px;
+    }
+    .interact-bottom-nav .flow-btn:hover {
+      border-color: rgba(200, 215, 255, 0.55);
+      box-shadow: none;
+    }
+    .interact-bottom-nav .flow-btn-muted {
+      border-color: rgba(150, 170, 220, 0.28);
+      color: rgba(175, 190, 230, 0.65);
+    }
+    .raw-memory-hud {
+      display: none;
+      text-align: center;
+      pointer-events: none;
+      width: 100%;
+    }
+    .raw-born-label {
+      font-family: 'Inter', sans-serif;
+      font-size: 10px;
+      font-weight: 400;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: rgba(165, 200, 255, 0.78);
+      margin: 0 0 12px;
+    }
+    .raw-memory-quote {
+      font-family: 'Cormorant Garamond', 'Playfair Display', serif;
+      font-weight: 300;
+      font-size: clamp(17px, 2.2vw, 26px);
+      letter-spacing: 0.035em;
+      line-height: 1.45;
+      color: rgba(248, 250, 255, 0.95);
+      margin: 0 auto;
+      max-width: 42em;
+    }
+
+    #interactModeBanner {
+      display: none;
+      position: fixed;
+      top: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 25;
+      font-family: ui-monospace, 'SFMono-Regular', Menlo, Monaco, Consolas, monospace;
+      font-size: 9px;
+      font-weight: 400;
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+      color: rgba(210, 222, 250, 0.9);
+      border: 1px solid rgba(150, 175, 230, 0.42);
+      padding: 7px 16px;
+      pointer-events: none;
+      background: rgba(8, 12, 28, 0.35);
+    }
+
+    /* Collective merge callout (line + card), anchored to sphere in JS */
+    .collective-merge-layer {
+      position: fixed;
+      inset: 0;
+      z-index: 42;
+      pointer-events: none;
+    }
+    .merge-callout {
+      position: fixed;
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      transform: translateY(-50%);
+      transition: opacity 0.28s ease;
+      pointer-events: none;
+    }
+    .merge-callout-connector {
+      flex-shrink: 0;
+      display: block;
+      margin-top: -6px;
+    }
+    .merge-callout-card {
+      flex-shrink: 0;
+      min-width: min(280px, 52vw);
+      max-width: min(380px, 72vw);
+      margin-left: -4px;
+      padding: 18px 20px 16px;
+      background: rgba(14, 22, 48, 0.94);
+      border: 1px solid rgba(255, 255, 255, 0.55);
+      pointer-events: auto;
+      cursor: pointer;
+      text-align: left;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+    }
+    .merge-callout-head {
+      font-family: 'Inter', sans-serif;
+      font-size: 9px;
+      font-weight: 400;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: rgba(200, 210, 235, 0.65);
+      margin-bottom: 12px;
+    }
+    .merge-callout-main {
+      font-family: 'Cormorant Garamond', 'Playfair Display', serif;
+      font-style: italic;
+      font-weight: 300;
+      font-size: clamp(15px, 1.9vw, 20px);
+      letter-spacing: 0.04em;
+      line-height: 1.45;
+      color: rgba(248, 250, 255, 0.96);
+      margin: 0 0 14px;
+    }
+    .merge-callout-foot {
+      font-family: 'Inter', sans-serif;
+      font-size: 9px;
+      letter-spacing: 0.12em;
+      text-transform: lowercase;
+      color: rgba(175, 188, 220, 0.55);
+      margin-bottom: 6px;
+    }
+    .merge-callout-sources {
+      font-family: 'Inter', sans-serif;
+      font-size: 10px;
+      font-weight: 300;
+      letter-spacing: 0.04em;
+      line-height: 1.55;
+      color: rgba(195, 205, 235, 0.72);
+    }
     .popup-overlay {
       display:none;
       position:fixed;
@@ -378,6 +537,506 @@
       font-family: 'Inter', sans-serif; font-size: 10px;
       letter-spacing: 0.14em; color: rgba(150,165,210,0.35); margin-top: 12px;
     }
+
+    /* ─── Onboarding: landing, auth choice, memory entry, ticker ─── */
+    .onboarding-ticker {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 40px;
+      background: #f08080;
+      z-index: 90;
+      overflow: hidden;
+      display: none;
+    }
+    .onboarding-ticker-track {
+      display: flex;
+      width: max-content;
+      animation: ob-marquee 40s linear infinite;
+      will-change: transform;
+    }
+    .onboarding-ticker-seg {
+      flex-shrink: 0;
+      padding-right: 3rem;
+      font-family: 'Playfair Display', 'Cormorant Garamond', serif;
+      font-size: 13px;
+      font-weight: 400;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #fff;
+      line-height: 40px;
+      white-space: nowrap;
+    }
+    .onboarding-ticker-seg .ticker-lower {
+      text-transform: none;
+      letter-spacing: 0.08em;
+    }
+    @keyframes ob-marquee {
+      0% { transform: translateX(0); }
+      100% { transform: translateX(-50%); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .onboarding-ticker-track { animation: none; justify-content: center; flex-wrap: wrap; }
+    }
+
+    .ob-page {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      display: none;
+      flex-direction: column;
+      background: #060A19;
+      color: #fff;
+      pointer-events: auto;
+      padding: clamp(24px, 5vh, 48px) clamp(20px, 5vw, 56px);
+      padding-bottom: 52px;
+    }
+
+    .ob-btn {
+      font-family: 'Inter', sans-serif;
+      font-size: 11px;
+      letter-spacing: 0.2em;
+      text-transform: lowercase;
+      padding: 14px 32px;
+      cursor: pointer;
+      background: transparent;
+      transition: border-color 0.25s, color 0.25s, opacity 0.25s;
+    }
+    .ob-btn--primary {
+      border: 1px solid rgba(255, 255, 255, 0.85);
+      color: #fff;
+    }
+    .ob-btn--primary:hover {
+      border-color: #fff;
+      background: rgba(255, 255, 255, 0.06);
+    }
+    .ob-btn--ghost {
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: rgba(255, 255, 255, 0.38);
+    }
+    .ob-btn--ghost:hover {
+      border-color: rgba(255, 255, 255, 0.28);
+      color: rgba(255, 255, 255, 0.55);
+    }
+    .ob-landing-actions,
+    .ob-auth-btns,
+    .ob-memory-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+      justify-content: center;
+      align-items: center;
+    }
+
+    /* Landing + auth: hero + wispy (landing-wispy-bg.js); eyes softened in shader */
+    .ob-landing {
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      /* Match auth / memory onboarding (#060A19), not near-black */
+      background: #060a19;
+    }
+    .ob-landing-wispy-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      z-index: 0;
+      pointer-events: none;
+    }
+    .ob-landing-center {
+      position: relative;
+      z-index: 2;
+      max-width: 520px;
+      text-align: center;
+    }
+    .ob-landing-logo {
+      font-family: 'Playfair Display', 'Cormorant Garamond', serif;
+      font-weight: 400;
+      font-size: clamp(42px, 8vw, 72px);
+      letter-spacing: 0.08em;
+      line-height: 1.05;
+      color: #fff;
+    }
+    .ob-landing-copy {
+      margin-top: clamp(28px, 4vh, 44px);
+      font-family: 'Inter', sans-serif;
+      font-size: clamp(13px, 1.5vw, 15px);
+      font-weight: 300;
+      line-height: 1.75;
+      color: #fff;
+    }
+    .ob-landing-copy p + p {
+      margin-top: 0.65em;
+    }
+    .ob-landing-copy .ob-landing-break {
+      margin-top: 1.35em;
+    }
+    .ob-landing-copy strong {
+      font-weight: 600;
+      color: #fff;
+    }
+    .ob-landing-actions {
+      margin-top: clamp(36px, 5vh, 52px);
+    }
+
+    /* Shared top-left brand (memory entry uses Cormorant title; auth uses Playfair below) */
+    .ob-top-brand {
+      position: absolute;
+      top: clamp(24px, 5vh, 48px);
+      left: clamp(20px, 5vw, 56px);
+      max-width: min(340px, 88vw);
+      pointer-events: none;
+    }
+    .ob-brand-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-weight: 300;
+      font-size: 13px;
+      letter-spacing: 0.32em;
+      text-transform: uppercase;
+      color: #fff;
+    }
+    .ob-brand-tag {
+      margin-top: 10px;
+      font-family: 'Inter', sans-serif;
+      font-size: 11px;
+      font-weight: 300;
+      line-height: 1.65;
+      letter-spacing: 0.06em;
+      color: rgba(255, 255, 255, 0.78);
+    }
+
+    /* Auth choice — same hero + wispy WebGL as landing (authWispyCanvas) */
+    .ob-page.ob-auth-choice {
+      position: fixed;
+      inset: 0;
+      background: #060A19;
+      padding: 0 0 52px;
+      flex-direction: column;
+      align-items: stretch;
+      justify-content: flex-start;
+      overflow: hidden;
+    }
+    .ob-auth-wispy-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      z-index: 0;
+      pointer-events: none;
+    }
+    .ob-auth-choice .ob-top-brand {
+      position: absolute;
+      top: clamp(24px, 5vh, 48px);
+      left: clamp(20px, 5vw, 56px);
+      max-width: min(340px, 88vw);
+      text-align: left;
+      pointer-events: none;
+      z-index: 2;
+    }
+    .ob-auth-choice .ob-brand-title {
+      font-family: 'Playfair Display', 'Cormorant Garamond', serif;
+      font-weight: 400;
+      font-size: clamp(15px, 1.9vw, 19px);
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: #fff;
+    }
+    .ob-auth-choice .ob-brand-tag {
+      margin-top: 11px;
+      font-size: 11px;
+      font-weight: 300;
+      line-height: 1.65;
+      letter-spacing: 0.02em;
+      text-transform: lowercase;
+      color: rgba(255, 255, 255, 0.88);
+    }
+    .ob-auth-center-wrap {
+      position: relative;
+      z-index: 1;
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: clamp(20px, 4vh, 32px) clamp(20px, 5vw, 40px);
+      box-sizing: border-box;
+    }
+    .ob-auth-center {
+      text-align: center;
+      max-width: 28rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .ob-auth-copy {
+      margin-bottom: clamp(28px, 4vh, 40px);
+    }
+    .ob-auth-choice .ob-auth-kicker {
+      font-family: 'Inter', sans-serif;
+      font-size: clamp(13px, 1.4vw, 15px);
+      font-weight: 400;
+      letter-spacing: 0.02em;
+      text-transform: lowercase;
+      color: rgba(255, 255, 255, 0.96);
+      margin-bottom: 0.85em;
+    }
+    .ob-auth-choice .ob-auth-lead {
+      font-family: 'Inter', sans-serif;
+      font-size: clamp(12px, 1.3vw, 14px);
+      font-weight: 300;
+      line-height: 1.75;
+      letter-spacing: 0.02em;
+      text-transform: lowercase;
+      color: rgba(255, 255, 255, 0.9);
+      margin-bottom: 0;
+    }
+    .ob-auth-choice .ob-auth-btns {
+      gap: 20px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .ob-auth-choice .ob-btn--primary {
+      border: 1px solid rgba(175, 188, 255, 0.5);
+      color: rgba(255, 255, 255, 0.95);
+    }
+    .ob-auth-choice .ob-btn--primary:hover {
+      border-color: rgba(195, 205, 255, 0.75);
+      background: rgba(255, 255, 255, 0.04);
+      color: #fff;
+    }
+    .ob-auth-choice .ob-btn--ghost {
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: rgba(255, 255, 255, 0.3);
+    }
+    .ob-auth-choice .ob-btn--ghost:hover {
+      border-color: rgba(255, 255, 255, 0.2);
+      color: rgba(255, 255, 255, 0.45);
+    }
+
+    /* Memory entry — matches reference: #0a1128, crosshair at true viewport center, form ~15% from bottom */
+    .ob-page.ob-memory-entry {
+      z-index: 28;
+      background: #0a1128;
+      color: #d1d1d1;
+      padding: 0;
+      overflow: hidden;
+    }
+    .ob-memory-entry .ob-top-brand {
+      top: 5%;
+      left: 5%;
+      max-width: min(360px, 88vw);
+    }
+    .ob-memory-entry .ob-brand-title {
+      font-family: 'Playfair Display', 'Cormorant Garamond', serif;
+      font-weight: 400;
+      font-size: clamp(14px, 1.8vw, 18px);
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      color: #d1d1d1;
+    }
+    .ob-memory-entry .ob-brand-tag {
+      margin-top: 10px;
+      font-size: 11px;
+      font-weight: 300;
+      line-height: 1.65;
+      letter-spacing: 0.04em;
+      text-transform: lowercase;
+      color: rgba(209, 209, 209, 0.45);
+    }
+    .ob-memory-crosshair-layer {
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+    }
+    .ob-memory-entry .ob-cross-line {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      background: rgba(209, 209, 209, 0.38);
+      pointer-events: none;
+    }
+    .ob-memory-entry .ob-cross-h {
+      width: min(720px, 88vw);
+      height: 1px;
+      transform: translate(-50%, -50%);
+    }
+    .ob-memory-entry .ob-cross-v {
+      width: 1px;
+      height: min(380px, 48vh);
+      transform: translate(-50%, -50%);
+    }
+    .ob-memory-entry .ob-cross-dot {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 5px;
+      height: 5px;
+      margin: -2.5px 0 0 -2.5px;
+      border-radius: 50%;
+      background: rgba(230, 230, 230, 0.95);
+      box-shadow: none;
+      pointer-events: none;
+    }
+    .ob-memory-entry .ob-cross-label {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      font-family: 'Inter', sans-serif;
+      font-size: 10px;
+      font-weight: 300;
+      font-style: normal;
+      letter-spacing: 0.08em;
+      color: rgba(209, 209, 209, 0.72);
+      white-space: nowrap;
+      pointer-events: none;
+    }
+    .ob-memory-entry .ob-cross-label--l {
+      right: calc(50% + 12px);
+      text-align: right;
+    }
+    .ob-memory-entry .ob-cross-label--r {
+      left: calc(50% + 12px);
+      text-align: left;
+    }
+    .ob-memory-form {
+      position: absolute;
+      left: 50%;
+      bottom: 15%;
+      transform: translateX(-50%);
+      width: min(92vw, 440px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      z-index: 2;
+      pointer-events: auto;
+      padding: 0 16px;
+      box-sizing: border-box;
+    }
+    .ob-memory-prompt {
+      font-family: 'Cormorant Garamond', 'Playfair Display', serif;
+      font-style: italic;
+      font-weight: 300;
+      font-size: 14px;
+      letter-spacing: 0.05em;
+      color: rgba(209, 209, 209, 0.88);
+      margin-bottom: 14px;
+      text-align: center;
+    }
+    .ob-memory-entry #inputArea {
+      position: relative;
+      left: auto;
+      bottom: auto;
+      transform: none;
+      z-index: auto;
+      width: 100%;
+      max-width: min(380px, max(38vw, 260px));
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 22px;
+    }
+    .ob-memory-entry #memInput {
+      width: 100%;
+      background: transparent;
+      border: none;
+      border-bottom: 1px solid rgba(209, 209, 209, 0.35);
+      color: #d1d1d1;
+      font-family: 'Inter', sans-serif;
+      font-style: normal;
+      font-weight: 300;
+      font-size: 13px;
+      letter-spacing: 0.04em;
+      padding: 10px 0 8px;
+      outline: none;
+      text-align: center;
+      caret-color: rgba(200, 200, 210, 0.9);
+      transition: border-color 0.25s;
+    }
+    .ob-memory-entry #memInput::placeholder {
+      color: rgba(209, 209, 209, 0.2);
+      font-style: normal;
+    }
+    .ob-memory-entry #memInput:focus {
+      border-bottom-color: rgba(209, 209, 209, 0.55);
+      box-shadow: none;
+    }
+    .ob-memory-entry .ob-memory-actions {
+      gap: 18px;
+      margin-top: 2px;
+    }
+    .ob-memory-entry .ob-btn {
+      font-size: 11px;
+      letter-spacing: 0.14em;
+      padding: 12px 22px;
+    }
+    .ob-memory-entry .ob-btn--primary {
+      border: 1px solid rgba(209, 209, 209, 0.55);
+      color: rgba(230, 230, 230, 0.95);
+    }
+    .ob-memory-entry .ob-btn--primary:hover {
+      border-color: rgba(230, 230, 230, 0.85);
+      background: rgba(255, 255, 255, 0.04);
+      color: #fff;
+    }
+    .ob-memory-entry .ob-btn--ghost {
+      border: 1px solid rgba(209, 209, 209, 0.12);
+      color: rgba(209, 209, 209, 0.28);
+    }
+    .ob-memory-entry .ob-btn--ghost:hover {
+      border-color: rgba(209, 209, 209, 0.22);
+      color: rgba(209, 209, 209, 0.45);
+    }
+    .ob-memory-entry #hint {
+      display: none;
+    }
+
+    .login-overlay {
+      z-index: 85;
+      background: rgba(5, 5, 12, 0.97);
+      padding-bottom: 52px;
+    }
+    .login-panel {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+      max-width: 340px;
+      width: 92vw;
+    }
+    .login-panel #loginTitle {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 18px;
+      letter-spacing: 0.2em;
+      text-transform: lowercase;
+      color: rgba(255, 255, 255, 0.9);
+      margin-bottom: 4px;
+    }
+    .login-panel .auth-field {
+      width: 100%;
+      background: transparent;
+      border: 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+      padding: 12px 4px;
+      color: rgba(255, 255, 255, 0.92);
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 18px;
+      outline: none;
+    }
+    .login-panel .auth-field::placeholder {
+      color: rgba(255, 255, 255, 0.28);
+    }
+    .login-panel .login-actions {
+      display: flex;
+      gap: 16px;
+      margin-top: 12px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
   </style>
 </head>
 <body>
@@ -387,49 +1046,96 @@
     <small>preserving your rights to your memories…</small>
   </div>
 
-  <div id="title">
-    <h1>Imoria</h1>
-    <p>your memories, encoded. add yours to join the void with other imorians.</p>
+  <div id="onboardingTicker" class="onboarding-ticker" aria-hidden="true">
+    <div class="onboarding-ticker-track">
+      <span class="onboarding-ticker-seg">| RULE <span class="ticker-lower">central</span> | YR 2050 ALERT | RULE <span class="ticker-lower">central</span> | YR 2050 ALERT | RULE <span class="ticker-lower">central</span> | YR 2050 ALERT | RULE <span class="ticker-lower">central</span> | </span>
+      <span class="onboarding-ticker-seg" aria-hidden="true">| RULE <span class="ticker-lower">central</span> | YR 2050 ALERT | RULE <span class="ticker-lower">central</span> | YR 2050 ALERT | RULE <span class="ticker-lower">central</span> | YR 2050 ALERT | RULE <span class="ticker-lower">central</span> | </span>
+    </div>
   </div>
 
-  <div id="inputArea">
-    <input id="memInput" type="text" maxlength="140"
-           placeholder="what do you remember?"
-           autocomplete="off" spellcheck="false"/>
-    <div id="hint">enter to add</div>
-    <button class="flow-btn flow-btn-muted" id="skipToVoidBtn" style="display:none; margin-top:4px; font-size:9px; padding:6px 20px;">enter the void</button>
-  </div>
-
-  <div id="voidEnter" style="display:none; position:fixed; bottom:80px; left:50%; transform:translateX(-50%); z-index:12; gap:18px;">
-    <button class="flow-btn" id="loginBtn">login</button>
-    <button class="flow-btn flow-btn-muted" id="signupBtn">sign up</button>
-  </div>
-  <div id="introOverlay" class="popup-overlay">
-    <div class="popup-card">
-      <p class="popup-title">IMORIA — VOID PROTOCOL</p>
-      <p style="margin-top:10px; color:rgba(255,90,90,0.96); letter-spacing:0.2em; text-transform:uppercase; font-size:14px;">2050 ALERT:</p>
-      <p class="popup-body">Your memories are no longer your own.<br/>They're harvested, remixed and weaponized.<br/><br/>But what exists in your mind is your territory.<br/>This is your space to defend it.</p>
-      <div class="popup-actions">
-        <button class="flow-btn" id="closeIntroBtn">ENTER THE VOID</button>
-        <button class="flow-btn flow-btn-muted" id="leaveIntroBtn">LEAVE</button>
+  <div id="landingScreen" class="ob-page ob-landing">
+    <canvas id="landingWispyCanvas" class="ob-landing-wispy-canvas" aria-hidden="true"></canvas>
+    <div class="ob-landing-center">
+      <h1 class="ob-landing-logo">IMORIA</h1>
+      <div class="ob-landing-copy">
+        <p>Your memories are no longer your own.</p>
+        <p>They are being harvested, remixed and weaponised.</p>
+        <p class="ob-landing-break">But what exists in your mind is <strong>your</strong> territory.</p>
+        <p>The Imorian void is our way to defend them.</p>
+      </div>
+      <div class="ob-landing-actions">
+        <button type="button" class="ob-btn ob-btn--primary" id="closeIntroBtn">enter the void</button>
+        <button type="button" class="ob-btn ob-btn--ghost" id="leaveIntroBtn">leave</button>
       </div>
     </div>
   </div>
 
-  <div id="loginOverlay" class="login-overlay">
-    <p style="font-size:16px; color:rgba(200,215,255,0.9); font-style:italic; margin-bottom:8px;" id="loginTitle">login</p>
-    <input id="authUsername" type="text" placeholder="choose a username" autocomplete="username"
-      style="width:280px; background:transparent; border:0; border-bottom:1px solid rgba(255,255,255,0.15); padding:10px 4px; color:rgba(210,220,245,0.9); font-family:'Cormorant Garamond',serif; font-size:18px; outline:none;"/>
-    <input id="authPassword" type="password" placeholder="password" autocomplete="current-password"
-      style="width:280px; background:transparent; border:0; border-bottom:1px solid rgba(255,255,255,0.15); padding:10px 4px; color:rgba(210,220,245,0.9); font-family:'Cormorant Garamond',serif; font-size:18px; outline:none;"/>
-    <div id="authError" class="auth-error" style="display:none; color:rgba(255,140,140,0.9); font-size:11px; letter-spacing:0.1em;"></div>
-    <div style="display:flex; gap:16px; margin-top:8px;">
-      <button class="flow-btn" id="authSubmitBtn">enter</button>
-      <button class="flow-btn flow-btn-muted" id="authBackBtn">back</button>
+  <div id="authChoiceScreen" class="ob-page ob-auth-choice">
+    <canvas id="authWispyCanvas" class="ob-auth-wispy-canvas" aria-hidden="true"></canvas>
+    <header class="ob-top-brand">
+      <h1 class="ob-brand-title">IMORIA</h1>
+      <p class="ob-brand-tag">your memories. encoded. known. add yours and join the void with other imorians.</p>
+    </header>
+    <div class="ob-auth-center-wrap">
+      <div class="ob-auth-center">
+        <div class="ob-auth-copy">
+          <p class="ob-auth-kicker">the void is calling</p>
+          <p class="ob-auth-lead">here you choose your own identity, your own path, and your own trasability.</p>
+        </div>
+        <div class="ob-auth-btns">
+          <button type="button" class="ob-btn ob-btn--primary" id="loginBtn">login</button>
+          <button type="button" class="ob-btn ob-btn--ghost" id="signupBtn">sign up</button>
+        </div>
+      </div>
     </div>
   </div>
 
-  <div id="symbolOverlay" style="display:none; position:fixed; inset:0; z-index:15; pointer-events:auto;">
+  <div id="memoryEntryScreen" class="ob-page ob-memory-entry">
+    <header class="ob-top-brand">
+      <h1 class="ob-brand-title">IMORIA</h1>
+      <p class="ob-brand-tag">your memories. encoded. known. add yours and join the void with other imorians.</p>
+    </header>
+    <div class="ob-memory-crosshair-layer" aria-hidden="true">
+      <span class="ob-cross-line ob-cross-h"></span>
+      <span class="ob-cross-line ob-cross-v"></span>
+      <span class="ob-cross-dot"></span>
+      <span class="ob-cross-label ob-cross-label--l">add a memory</span>
+      <span class="ob-cross-label ob-cross-label--r">that matters...</span>
+    </div>
+    <div class="ob-memory-form">
+      <label class="ob-memory-prompt" for="memInput">what do you remember?</label>
+      <div id="inputArea" class="ob-input-area-inner">
+        <input id="memInput" type="text" maxlength="140"
+               placeholder=""
+               autocomplete="off" spellcheck="false"/>
+        <div id="hint"> press enter to add</div>
+        <div class="ob-memory-actions">
+          <button type="button" class="ob-btn ob-btn--primary" id="addMemorySubmitBtn">add new memory</button>
+          <button type="button" class="ob-btn ob-btn--ghost" id="skipToVoidBtn">view the void</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="title">
+    <h1>IMORIA</h1>
+    <p>your memories. encoded. known. add yours and join the void with other imorians.</p>
+  </div>
+
+  <div id="loginOverlay" class="login-overlay">
+    <div class="login-panel">
+      <p id="loginTitle">login</p>
+      <input id="authUsername" class="auth-field" type="text" placeholder="choose a username" autocomplete="username"/>
+      <input id="authPassword" class="auth-field" type="password" placeholder="password" autocomplete="current-password"/>
+      <div id="authError" class="auth-error" style="display:none; position:static; transform:none; text-align:center;"></div>
+      <div class="login-actions">
+        <button class="ob-btn ob-btn--primary" type="button" id="authSubmitBtn">enter</button>
+        <button class="ob-btn ob-btn--ghost" type="button" id="authBackBtn">back</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="symbolOverlay" style="display:none; position:fixed; inset:0; z-index:87; pointer-events:auto;">
     <canvas id="authDrawCanvas"></canvas>
     <div class="auth-instructions">
       <p style="font-size:18px; letter-spacing:0.14em; text-transform:uppercase; color:rgba(230,238,255,0.95);">MARK YOUR TERRITORY</p>
@@ -440,7 +1146,7 @@
     </div>
     <div id="symbolError" class="auth-error" style="display:none;"></div>
   </div>
-  <div id="symbolDone" class="flow-actions" style="display:none; position:fixed; bottom:80px; left:50%; transform:translateX(-50%); z-index:16;">
+  <div id="symbolDone" class="flow-actions" style="display:none; position:fixed; bottom:80px; left:50%; transform:translateX(-50%); z-index:88;">
     <button class="flow-btn" id="symbolClearBtn">Draw</button>
     <button class="flow-btn flow-btn-muted" id="symbolDoneBtn">Remain unmarked</button>
   </div>
@@ -451,15 +1157,21 @@
     <button class="flow-btn flow-btn-muted" type="button" id="cancelPreviewBtn">Cancel</button>
   </div>
 
-  <div id="focusNav" class="flow-actions" style="display:none; z-index:100; pointer-events:auto; bottom:140px;">
-    <button class="flow-btn flow-btn-muted" type="button" id="focusPrev">← prev</button>
-    <button class="flow-btn flow-btn-muted" type="button" id="focusNext">next →</button>
+  <div id="interactBottomWrap" class="interact-bottom-wrap" aria-live="polite">
+    <div id="focusNav" class="flow-actions interact-bottom-nav" style="display:none;">
+      <button class="flow-btn flow-btn-muted" type="button" id="focusPrev">← prev</button>
+      <button class="flow-btn flow-btn-muted" type="button" id="focusNext">next →</button>
+    </div>
+    <div id="rawMemoryHud" class="raw-memory-hud">
+      <p id="rawBornLabel" class="raw-born-label"></p>
+      <p id="rawMemoryQuote" class="raw-memory-quote"></p>
+    </div>
   </div>
 
   <div id="gestureTutorial" class="popup-overlay" style="z-index:32;">
     <div class="popup-card">
       <p class="popup-title">CONTROL IN YOUR HANDS</p>
-      <p class="popup-body">In the future, gestures will let you select which memory version you live.<br/>Today, we practice.<br/><br/>Open palm → COLLECTIVE - Watch your memory interact with other's memories, evolve and get morphed.<br/>Peace sign → RECALL - Let the void stimulate biological recall, where each time you remember, you rewrite the memory ever so slightly.<br/>Fist → RAW - Your authentic, true memory, access this when you start feeling lost in all the changes and find yourself.</p>
+      <p class="popup-body">In the future, gestures will let you select which memory version you live.<br/>Today, we practice.<br/><br/>Pinch thumb and index together and move your hand left/right and up/down to orbit the memories—the same motion as dragging with the mouse.<br/><br/>Use both hands: pinch thumb and index on each hand, then move your hands apart to zoom in and bring them together to zoom out.<br/><br/>Index, middle, and little finger up (ring finger down) → RECALL - Let the void stimulate biological recall, where each time you remember, you rewrite the memory ever so slightly.<br/><br/>Open hand (all four fingers up), then the rock sign (index and little finger up, middle and ring down) → COLLECTIVE - Watch your memory interact with others' memories, evolve and get morphed. Do the rock within a couple of seconds of the open hand.<br/><br/>Closed palm (fingers folded) → RAW - Your authentic memory; use this when you start feeling lost in all the changes and want to find yourself.</p>
       <div class="popup-actions">
         <button class="flow-btn" id="enableGesturesBtn">Try gesture recognition - enable camera</button>
         <button class="flow-btn flow-btn-muted" id="skipGesturesBtn">Use buttons</button>
@@ -492,6 +1204,7 @@
 
   <div id="status">loading…</div>
   <div id="poolCounter" style="position:fixed; top:62px; right:30px; z-index:20; font-family:'Inter',sans-serif; font-size:9px; letter-spacing:0.14em; text-transform:uppercase; color:rgba(190,205,245,0.72);">pool 0</div>
+  <div id="interactModeBanner" aria-hidden="true">mode: raw</div>
   <div id="modeFlash" style="position:fixed; top:78px; left:50%; transform:translate(-50%,-8px); z-index:26; font-family:'Inter',sans-serif; font-size:12px; letter-spacing:0.2em; text-transform:uppercase; color:rgba(236,244,255,0.95); background:rgba(16,22,48,0.72); border:1px solid rgba(176,190,245,0.55); padding:8px 14px; opacity:0; pointer-events:none; transition:all .22s ease;"></div>
 
   <video id="handVideo" style="display:none;" playsinline muted></video>
@@ -503,12 +1216,14 @@
     <div class="tl-entries" id="tlEntries"></div>
   </div>
 
+  <div id="collectiveMergeLayer" class="collective-merge-layer"></div>
+
   <div id="canvas-container"></div>
 
   <div id="infoOverlay" class="popup-overlay" style="z-index:35;">
     <div class="popup-card" style="text-align:left;">
       It's 2050 - everything you say is already heard, captured, infiltrated and monetised on. Now they've come for your individual memories, skewing them to get you to remember what they want so they can push for their ways of life. That's where Imoria comes in, silent, dark, intentionally untraceable unless you own the memory. If it exists in your brain, it should be yours to own, yours to manipulate and yours to give to the world, thats our principle.<br/><br/>
-      The void gives you a space to store your memories, but also watch them evolve and pick and chose which version of them you consiously use. the long term specualtion of this is that the void exists within your vrain using a brian chip, and that using hand gestures (stimulated rigth now with the camera) you can control whcih version of your memory - raw, recall or collective, you use in a situation. <br/> <br/> Remember Open palm → COLLECTIVE - Watch your memory interact with other's memories, evolve and get morphed.<br/>Peace sign → RECALL - Let the void stimulate biological recall, where each time you remember, you rewrite the memory ever so slightly.<br/>Fist → RAW - Your authentic, true memory, access this when you start feeling lost in all the changes and find yourself.
+      The void gives you a space to store your memories, but also watch them evolve and pick and chose which version of them you consiously use. the long term specualtion of this is that the void exists within your vrain using a brian chip, and that using hand gestures (stimulated rigth now with the camera) you can control whcih version of your memory - raw, recall or collective, you use in a situation. <br/> <br/> Pinch thumb+index and move to orbit; both hands pinched—spread apart / together for zoom. Index, middle, and little finger up (ring down) → RECALL. Open hand, then rock sign within a couple of seconds → COLLECTIVE. Closed palm → RAW.
       <div class="popup-actions" style="justify-content:flex-end;"><button class="flow-btn flow-btn-muted" id="closeInfoBtn">close</button></div>
     </div>
   </div>
@@ -536,9 +1251,11 @@
   <script src="memory.js"></script>
   <script src="glyphs.js"></script>
   <script src="three-renderer.js"></script>
+  <script src="collective-merge-ui.js"></script>
   <script src="rendering.js"></script>
   <script src="screens.js"></script>
   <script src="physics.js"></script>
+  <script src="landing-wispy-bg.js"></script>
   <script src="ui.js"></script>
   <script src="interaction.js"></script>
   <script src="sketch.js"></script>

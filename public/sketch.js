@@ -97,9 +97,16 @@ function setup() {
     e.preventDefault();
     triggerAdd();
   });
+  const addMemorySubmitBtn = document.getElementById('addMemorySubmitBtn');
+  if (addMemorySubmitBtn) addMemorySubmitBtn.addEventListener('click', () => { triggerAdd(); });
   const closeIntroBtn = document.getElementById('closeIntroBtn');
   const leaveIntroBtn = document.getElementById('leaveIntroBtn');
-  if (closeIntroBtn) closeIntroBtn.addEventListener('click', () => { introPopupDismissed = true; });
+  if (closeIntroBtn) {
+    closeIntroBtn.addEventListener('click', () => {
+      introPopupDismissed = true;
+      if (typeof updateFlowUI === 'function') updateFlowUI();
+    });
+  }
   if (leaveIntroBtn) leaveIntroBtn.addEventListener('click', () => { introPopupDismissed = true; });
 
   checkSession().then(loggedIn => {
@@ -207,6 +214,7 @@ function setup() {
       memories[rawFocusIdx]._recallLoading = false;
     }
     populateTimeline();
+    if (typeof updateRawMemoryHud === 'function') updateRawMemoryHud();
   });
   if (focusNext) focusNext.addEventListener('click', () => {
     rawFocusIdx = nextOwnedMemory(1);
@@ -215,6 +223,7 @@ function setup() {
       memories[rawFocusIdx]._recallLoading = false;
     }
     populateTimeline();
+    if (typeof updateRawMemoryHud === 'function') updateRawMemoryHud();
   });
   const stampFinalBtn = document.getElementById('stampFinalBtn');
   if (stampFinalBtn) stampFinalBtn.addEventListener('click', doStampFinal);
@@ -245,7 +254,11 @@ function setup() {
     if (gesturesEnabled) {
       gesturesEnabled = false; showHandUI(false); setStatus('gestures off');
     } else {
-      if (handposeReady) { gesturesEnabled = true; showHandUI(true); setStatus('gestures on'); }
+      if (handposeReady) {
+        gesturesEnabled = true;
+        showHandUI(true);
+        setStatus('gestures on · pinch+move=orbit · two-hand pinch=zoom · 3 fingers=recall · open→rock=collective · closed palm=raw');
+      }
       else initHandpose();
     }
   });
@@ -306,14 +319,6 @@ function draw() {
       if (window.threeMemoryRenderer) {
         window.threeMemoryRenderer.renderMemories({ memories: [rawMem], R, rotX: curRotX, rotY: curRotY, camZ, leftShift: 0 });
       }
-      push();
-      noStroke(); fill(200, 215, 255, 200);
-      textAlign(CENTER, CENTER); textSize(14); textStyle(ITALIC);
-      text(`"${mem.originalSentence}"`, width / 2, height - 60);
-      textSize(9); textStyle(NORMAL); fill(150, 170, 220, 100);
-      const ownedR = getOwnedIndices(); const posR = ownedR.indexOf(rawFocusIdx) + 1;
-      text(`raw · ${posR} / ${ownedR.length}`, width / 2, height - 35);
-      pop();
     } else if (interactionMode === INTERACTION_MODE.RECALL && rawFocusIdx >= 0 && rawFocusIdx < memories.length && isMyMemory(memories[rawFocusIdx])) {
       hideAllMemoryLabels();
       if (!isDragging) rotY += 0.0032;
@@ -381,6 +386,9 @@ function draw() {
       }
       updateMemoryLabels2D();
     }
+  }
+  if (typeof updateCollectiveMergeCalloutPositions === 'function') {
+    updateCollectiveMergeCalloutPositions();
   }
   updateFlowUI();
 }

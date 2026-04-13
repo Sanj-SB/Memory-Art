@@ -334,6 +334,10 @@ No extra commentary.`;
     console.log(`[DEBUG:MERGE] Applying merge transforms...`);
     applyMerge(miA, newA, sim, srcB, memB.id);
     applyMerge(miB, newB, sim, srcA, memA.id);
+    if (interactionMode === INTERACTION_MODE.COLLECTIVE &&
+        typeof notifyCollectiveMergeIfUserOwned === 'function') {
+      notifyCollectiveMergeIfUserOwned(miA, miB, srcA, srcB);
+    }
     memA.isMerging = false;
     memB.isMerging = false;
     memA.cooldown = COOL_FRAMES;

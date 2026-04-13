@@ -1,43 +1,14 @@
 // Flow screen rendering: void, login, symbol, create, preview, final.
 
+/** VOID onboarding: HTML (landing / auth) covers the canvas; keep stack flat—no orbs, text, or space gradient bleed-through. */
 function drawVoid() {
-  drawSpaceBackground();
-  const t = frameCount * 0.004;
-
-  if (voidMemories.length > 0) {
-    if (window.threeMemoryRenderer) {
-      window.threeMemoryRenderer.renderVoidMemories(voidMemories, t, width, height);
-    }
-  } else {
-    push();
-    translate(width / 2, height / 2);
-    stroke(100, 140, 255, 35); strokeWeight(0.5);
-    line(-100, 0, 100, 0); line(0, -100, 0, 100);
-    noStroke();
-    pop();
-  }
-
-  push();
-  noStroke();
-  fill(200, 215, 255, 180);
-  textAlign(CENTER, CENTER);
-  textSize(14);
-  textStyle(ITALIC);
-  const memCount = voidMemories.length;
-  text('the void · memories drift here', width / 2, height / 2 - 60);
-  textSize(11);
-  textStyle(NORMAL);
-  fill(150, 170, 220, 100);
-  if (memCount > 0) {
-    text(`${memCount} memor${memCount !== 1 ? 'ies' : 'y'} floating · draw your identity to enter`, width / 2, height / 2 + 20);
-  } else {
-    text('draw your identity to enter', width / 2, height / 2 + 20);
-  }
-  pop();
+  if (window.threeMemoryRenderer) window.threeMemoryRenderer.clear();
+  background(6, 10, 25);
 }
 
 function drawLogin() {
-  drawSpaceBackground();
+  if (window.threeMemoryRenderer) window.threeMemoryRenderer.clear();
+  background(6, 10, 25);
 }
 
 function drawSymbol() {
@@ -118,15 +89,26 @@ function drawPreview() {
   }
   push();
   noStroke();
-  fill(200, 215, 255, 180);
-  textAlign(CENTER, CENTER);
-  textSize(12);
-  textStyle(ITALIC);
-  text(`"${pendingMemory}"`, width / 2, height - 90);
+  textAlign(CENTER, TOP);
+  const topPad = constrain(height * 0.065, 48, 100);
+  const maxW = width * 0.74;
+  const cx = width * 0.5;
+
   textSize(10);
+  textLeading(16);
   textStyle(NORMAL);
   fill(150, 170, 220, 120);
-  text('ready to stamp?', width / 2, height - 60);
+  text('ready to stamp?', cx, topPad);
+
+  const gap = 6;
+  const quoteY = topPad + textAscent() + textDescent() + gap;
+
+  fill(200, 215, 255, 180);
+  textSize(12);
+  textLeading(20);
+  textStyle(ITALIC);
+  const quoted = `"${pendingMemory}"`;
+  text(quoted, cx, quoteY, maxW);
   pop();
 }
 

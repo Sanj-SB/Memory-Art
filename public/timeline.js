@@ -66,3 +66,19 @@ function populateTimeline() {
   }
   entriesEl.innerHTML = html;
 }
+
+function updateRawMemoryHud() {
+  const bornEl = document.getElementById('rawBornLabel');
+  const quoteEl = document.getElementById('rawMemoryQuote');
+  if (!bornEl || !quoteEl) return;
+  if (appState !== APP_STATE.INTERACT || interactionMode !== INTERACTION_MODE.RAW) return;
+  const mem = rawFocusIdx >= 0 && rawFocusIdx < memories.length ? memories[rawFocusIdx] : null;
+  if (!mem || !isMyMemory(mem)) {
+    bornEl.textContent = '';
+    quoteEl.textContent = '';
+    return;
+  }
+  bornEl.textContent = formatBornAgo(getMemoryBirthTime(mem));
+  const q = (mem.originalSentence || mem.sentence || '').trim();
+  quoteEl.textContent = q ? `“${q}”` : '';
+}

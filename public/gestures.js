@@ -1,7 +1,23 @@
 // Hand gesture tutorial & detection (ml5.handPose)
 // Depends on globals from sketch.js: handpose, handVideo, handposeReady, gesturesEnabled,
 // lastGesture, lastGestureTime, GESTURE_DEBOUNCE, gestureTutorialShown, setStatus,
-// interactionMode, INTERACTION_MODE, switchMode.
+// interactionMode, INTERACTION_MODE, switchMode, appState, APP_STATE, mode, rotX, rotY, camZ.
+
+const PINCH_DIST_TO_PALM_MAX = 0.38;
+const HAND_ORBIT_SENS = 0.007;
+const ROT_X_LIMIT = Math.PI * 0.42;
+/** camZ delta per pixel of change in distance between the two pinch centers (video coords). */
+const TWO_HAND_ZOOM_SENS = 5.2;
+/** Ignore jitter smaller than this (px) between frames. */
+const TWO_HAND_ZOOM_MIN_DELTA_PX = 1.2;
+const CAM_Z_MIN = -400;
+const CAM_Z_MAX = 800;
+/** Max ms between an open-hand pose and a rock pose to enter collective */
+const COLLECTIVE_OPEN_TO_ROCK_MS = 2200;
+
+let pinchOrbPrev = null;
+let twoHandPinchPrevDist = null;
+let lastOpenHandAt = 0;
 
 function showGestureTutorial() {
   if (gestureTutorialShown || !gestureTutorialPending) return;
@@ -23,7 +39,11 @@ let handposeInitializing = false;
 function initHandpose() {
   console.log(`[DEBUG:GESTURE] initHandpose called (initializing=${handposeInitializing}, ready=${handposeReady})`);
   if (handposeInitializing || handposeReady) {
-    if (handposeReady) { gesturesEnabled = true; showHandUI(true); }
+    if (handposeReady) {
+      gesturesEnabled = true;
+      showHandUI(true);
+      setStatus('gestures on · pinch+move=orbit · two-hand pinch=zoom · 3 fingers=recall · open→rock=collective · closed palm=raw');
+    }
     return;
   }
   handposeInitializing = true;
@@ -58,7 +78,7 @@ function initHandpose() {
     console.log('[DEBUG:GESTURE] HandPose model ready — starting detection');
     if (dbg) dbg.textContent = 'model ready · detecting…';
     showHandUI(true);
-    setStatus('gestures on · palm=collective · peace=recall · fist=raw');
+    setStatus('gestures on · pinch+move=orbit · two-hand pinch=zoom · 3 fingers=recall · open→rock=collective · closed palm=raw');
 
     handpose.detectStart(p5Video, onHandResults);
   }
@@ -66,6 +86,8 @@ function initHandpose() {
   function onHandResults(results) {
     handsResults = results || [];
     if (handsResults.length === 0) {
+      pinchOrbPrev = null;
+      twoHandPinchPrevDist = null;
       if (dbg) dbg.textContent = 'detecting… no hand';
       return;
     }
@@ -74,15 +96,46 @@ function initHandpose() {
     const kp = hand.keypoints || hand.landmarks;
     const kpLen = kp ? kp.length : 0;
     if (!kp || kpLen < 21) {
+      twoHandPinchPrevDist = null;
       if (dbg) dbg.textContent = `hand · kp:${kpLen} · keys:${Object.keys(hand).join(',')}`;
       return;
     }
-    const g = detectGestureFromKeypoints(kp);
-    if (dbg) dbg.textContent = `gesture: ${g || '?'} · kp:${kpLen}`;
-    if (g && Date.now() - lastGestureTime > GESTURE_DEBOUNCE) {
+
+    const now = Date.now();
+    const canInteract = typeof appState !== 'undefined' && appState === APP_STATE.INTERACT && mode === 'display';
+    const kp1 = handsResults.length >= 2 ? (handsResults[1].keypoints || handsResults[1].landmarks) : null;
+    const kp1Len = kp1 ? kp1.length : 0;
+    const st0 = getThumbIndexPinchState(kp);
+    const st1 = kp1Len >= 21 ? getThumbIndexPinchState(kp1) : null;
+    const dualPinch = !!(canInteract && st0 && st1);
+
+    let zoomLabel = null;
+    if (dualPinch) {
+      pinchOrbPrev = null;
+      zoomLabel = tryApplyTwoHandPinchZoom(st0, st1);
+    } else {
+      twoHandPinchPrevDist = null;
+    }
+
+    if (!dualPinch) {
+      const pinchActive = tryApplyPinchOrbit(kp);
+      if (pinchActive) {
+        if (dbg) dbg.textContent = 'pinch · move to orbit';
+        return;
+      }
+    }
+
+    const g = detectGestureFromKeypoints(kp, now);
+    if (dbg) {
+      const zPart = zoomLabel ? ` · ${zoomLabel}` : (dualPinch ? ' · two-hand pinch (move apart/closer)' : '');
+      const handsNote = handsResults.length > 1 ? ` · hands:${handsResults.length}` : '';
+      dbg.textContent = `gesture: ${g || '?'} · kp:${kpLen}${handsNote}${zPart}`;
+    }
+    if (g && now - lastGestureTime > GESTURE_DEBOUNCE) {
       console.log(`[DEBUG:GESTURE] Gesture recognized: "${g}" — applying mode switch (debounce ok)`);
-      lastGestureTime = Date.now();
+      lastGestureTime = now;
       lastGesture = g;
+      if (g === 'collective') lastOpenHandAt = 0;
       applyGestureMode(g);
     }
   }
@@ -97,7 +150,72 @@ function showHandUI(on) {
   if (btn) { if (on) btn.classList.add('active'); else btn.classList.remove('active'); }
 }
 
-function detectGestureFromKeypoints(kp) {
+function kpPoint(kp, i) {
+  const p = kp[i];
+  if (!p) return { x: 0, y: 0 };
+  if (typeof p.x === 'number') return { x: p.x, y: p.y };
+  if (Array.isArray(p)) return { x: p[0] || 0, y: p[1] || 0 };
+  return { x: 0, y: 0 };
+}
+
+/** Thumb+index pinch: midpoint and palm scale, or null if hand invalid / not pinched. */
+function getThumbIndexPinchState(kp) {
+  if (!kp || kp.length < 21) return null;
+  const d = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+  const wrist = kpPoint(kp, 0);
+  const palmLen = d(wrist, kpPoint(kp, 9));
+  if (palmLen < 1) return null;
+  const thumbTip = kpPoint(kp, 4);
+  const indexTip = kpPoint(kp, 8);
+  const pinchDist = d(thumbTip, indexTip);
+  if (pinchDist >= palmLen * PINCH_DIST_TO_PALM_MAX) return null;
+  return {
+    cx: (thumbTip.x + indexTip.x) * 0.5,
+    cy: (thumbTip.y + indexTip.y) * 0.5,
+    palmLen
+  };
+}
+
+function tryApplyPinchOrbit(kp) {
+  const st = getThumbIndexPinchState(kp);
+  const canOrbit = typeof appState !== 'undefined' && appState === APP_STATE.INTERACT && mode === 'display';
+  if (!st || !canOrbit) {
+    pinchOrbPrev = null;
+    return false;
+  }
+  const { cx, cy } = st;
+  if (pinchOrbPrev) {
+    const dx = cx - pinchOrbPrev.x;
+    const dy = cy - pinchOrbPrev.y;
+    rotY += dx * HAND_ORBIT_SENS;
+    rotX -= dy * HAND_ORBIT_SENS;
+    rotX = Math.max(-ROT_X_LIMIT, Math.min(ROT_X_LIMIT, rotX));
+  }
+  pinchOrbPrev = { x: cx, y: cy };
+  return true;
+}
+
+/**
+ * Both hands thumb+index pinched: move pinch points apart → zoom in, together → zoom out.
+ * Stronger response when spreading (zoom in) than the old single-hand spread.
+ */
+function tryApplyTwoHandPinchZoom(stA, stB) {
+  const sep = Math.hypot(stB.cx - stA.cx, stB.cy - stA.cy);
+  let label = null;
+  if (twoHandPinchPrevDist != null) {
+    const dSep = sep - twoHandPinchPrevDist;
+    if (Math.abs(dSep) > TWO_HAND_ZOOM_MIN_DELTA_PX) {
+      let deltaCam = -dSep * TWO_HAND_ZOOM_SENS;
+      if (dSep > 0) deltaCam *= 1.35;
+      camZ = Math.max(CAM_Z_MIN, Math.min(CAM_Z_MAX, camZ + deltaCam));
+      label = dSep > 0 ? 'two-hand · zoom in' : 'two-hand · zoom out';
+    }
+  }
+  twoHandPinchPrevDist = sep;
+  return label;
+}
+
+function detectGestureFromKeypoints(kp, now) {
   if (!kp || kp.length < 21) return null;
   const pt = i => {
     const p = kp[i];
@@ -114,14 +232,24 @@ function detectGestureFromKeypoints(kp) {
     const tip = pt(tipIdx), pip = pt(pipIdx);
     return d(tip, wrist) > d(pip, wrist) * 1.05;
   };
-  const indexUp  = extended(8, 6);
+  const indexUp = extended(8, 6);
   const middleUp = extended(12, 10);
-  const ringUp   = extended(16, 14);
-  const pinkyUp  = extended(20, 18);
-  const count = [indexUp, middleUp, ringUp, pinkyUp].filter(Boolean).length;
-  if (count >= 3) return 'collective';
-  if (count === 2 && indexUp && middleUp) return 'recall';
-  if (count <= 1 && !indexUp && !middleUp) return 'raw';
+  const ringUp = extended(16, 14);
+  const pinkyUp = extended(20, 18);
+
+  const openHand = indexUp && middleUp && ringUp && pinkyUp;
+  if (openHand) lastOpenHandAt = now;
+
+  const closedPalm = !indexUp && !middleUp && !ringUp && !pinkyUp;
+  if (closedPalm) return 'raw';
+
+  const recallPose = indexUp && middleUp && pinkyUp && !ringUp;
+  if (recallPose) return 'recall';
+
+  const rock =
+    indexUp && pinkyUp && !middleUp && !ringUp;
+  if (rock && lastOpenHandAt > 0 && now - lastOpenHandAt <= COLLECTIVE_OPEN_TO_ROCK_MS) return 'collective';
+
   return null;
 }
 
