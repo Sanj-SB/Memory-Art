@@ -112,7 +112,7 @@ const threeMemoryRenderer = (() => {
         if (g) sharedGeoms.add(g);
       });
 
-      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
       renderer.setSize(window.innerWidth, window.innerHeight);
       if ('outputColorSpace' in renderer) renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -903,7 +903,83 @@ const threeMemoryRenderer = (() => {
     });
   }
 
-  return { init, isReady, resize, clear, renderMemories, renderVoidMemories, projectSphereCenterToScreen };
+  function captureMemoriesSnapshot({
+    width = 1200,
+    height = 900,
+    memories = [],
+    R = 120,
+    rotX = 0,
+    rotY = 0,
+    camZ = 0,
+    leftShift = 0,
+    activeOverlap = null,
+    collectiveSet = null,
+    clearColor = 0x060a19,
+    clearAlpha = 1
+  } = {}) {
+    if (!initOk || !renderer || !scene || !camera) return null;
+    const prevSize = new THREE.Vector2();
+    renderer.getSize(prevSize);
+    const prevPr = renderer.getPixelRatio ? renderer.getPixelRatio() : 1;
+    const prevAspect = camera.aspect;
+    const prevViewOffset = camera.view ? { ...camera.view } : null;
+    const prevClearColor = new THREE.Color();
+    renderer.getClearColor(prevClearColor);
+    const prevClearAlpha = renderer.getClearAlpha ? renderer.getClearAlpha() : 1;
+    const prevCanvasStyleWidth = renderer.domElement.style.width;
+    const prevCanvasStyleHeight = renderer.domElement.style.height;
+
+    // Isolate export from viewport/CSS scaling and render exactly at fixed pixel size.
+    renderer.domElement.style.width = `${width}px`;
+    renderer.domElement.style.height = `${height}px`;
+
+    renderer.setPixelRatio(1);
+    renderer.setSize(width, height, true);
+    camera.aspect = width / Math.max(1, height);
+    if (camera.clearViewOffset) camera.clearViewOffset();
+    camera.updateProjectionMatrix();
+    renderer.setClearColor(clearColor, clearAlpha);
+
+    renderMemories({ memories, R, rotX, rotY, camZ, leftShift, activeOverlap, collectiveSet });
+    const dataUrl = renderer.domElement.toDataURL('image/png');
+
+    const out = document.createElement('canvas');
+    out.width = width;
+    out.height = height;
+    const ctx = out.getContext('2d');
+    if (ctx) {
+      ctx.drawImage(renderer.domElement, 0, 0, width, height);
+      out.dataset.snapshotDataUrl = dataUrl;
+    }
+
+    renderer.setPixelRatio(prevPr);
+    renderer.setSize(
+      Math.max(1, Math.floor(prevSize.x)),
+      Math.max(1, Math.floor(prevSize.y)),
+      true
+    );
+    renderer.domElement.style.width = prevCanvasStyleWidth;
+    renderer.domElement.style.height = prevCanvasStyleHeight;
+    camera.aspect = prevAspect;
+    if (prevViewOffset && camera.setViewOffset) {
+      camera.setViewOffset(
+        prevViewOffset.fullWidth,
+        prevViewOffset.fullHeight,
+        prevViewOffset.offsetX,
+        prevViewOffset.offsetY,
+        prevViewOffset.width,
+        prevViewOffset.height
+      );
+    } else if (camera.clearViewOffset) {
+      camera.clearViewOffset();
+    }
+    camera.updateProjectionMatrix();
+    renderer.setClearColor(prevClearColor, prevClearAlpha);
+
+    return out;
+  }
+
+  return { init, isReady, resize, clear, renderMemories, renderVoidMemories, projectSphereCenterToScreen, captureMemoriesSnapshot };
 })();
 
 if (typeof window !== 'undefined') {

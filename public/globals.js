@@ -143,6 +143,20 @@ function getMemoryBirthTime(mem) {
   return (created && created.time) || mem.timeline[0].time || Date.now();
 }
 
+function getEnteredMemorySentence(mem) {
+  if (!mem) return '';
+  if (typeof mem.enteredSentence === 'string' && mem.enteredSentence.trim()) {
+    return mem.enteredSentence.trim();
+  }
+  if (mem.timeline && mem.timeline.length) {
+    const created = mem.timeline.find((e) => e.type === 'created' && typeof e.text === 'string' && e.text.trim());
+    if (created) return created.text.trim();
+  }
+  if (typeof mem.originalSentence === 'string' && mem.originalSentence.trim()) return mem.originalSentence.trim();
+  if (typeof mem.sentence === 'string' && mem.sentence.trim()) return mem.sentence.trim();
+  return '';
+}
+
 function mulberry32(seed) {
   let s = seed;
   return function () {

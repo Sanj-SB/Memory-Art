@@ -124,7 +124,7 @@
     #utils {
       position: fixed;
       bottom: 24px; right: 24px;
-      z-index: 10;
+      z-index: 30;
       display: flex;
       gap: 20px;
       align-items: center;
@@ -1026,28 +1026,30 @@
       inset: 0;
       z-index: 0;
       pointer-events: none;
+      --ob-cross-center-y: 40vh;
+      --ob-cross-size: min(64vh, 76vw, 720px);
     }
     .ob-memory-entry .ob-cross-line {
       position: absolute;
       left: 50%;
-      top: 50%;
+      top: var(--ob-cross-center-y);
       background: rgba(209, 209, 209, 0.38);
       pointer-events: none;
     }
     .ob-memory-entry .ob-cross-h {
-      width: min(720px, 88vw);
+      width: var(--ob-cross-size);
       height: 1px;
       transform: translate(-50%, -50%);
     }
     .ob-memory-entry .ob-cross-v {
       width: 1px;
-      height: min(380px, 48vh);
+      height: var(--ob-cross-size);
       transform: translate(-50%, -50%);
     }
     .ob-memory-entry .ob-cross-dot {
       position: absolute;
       left: 50%;
-      top: 50%;
+      top: var(--ob-cross-center-y);
       width: 5px;
       height: 5px;
       margin: -2.5px 0 0 -2.5px;
@@ -1058,14 +1060,14 @@
     }
     .ob-memory-entry .ob-cross-label {
       position: absolute;
-      top: 50%;
+      top: var(--ob-cross-center-y);
       transform: translateY(-50%);
       font-family: 'Inter', sans-serif;
-      font-size: 10px;
+      font-size: 12px;
       font-weight: 300;
       font-style: normal;
-      letter-spacing: 0.08em;
-      color: rgba(209, 209, 209, 0.72);
+      letter-spacing: 0.12em;
+      color: rgba(220, 220, 220, 0.86);
       white-space: nowrap;
       pointer-events: none;
     }
@@ -1132,8 +1134,11 @@
       transition: border-color 0.25s;
     }
     .ob-memory-entry #memInput::placeholder {
-      color: rgba(209, 209, 209, 0.2);
+      color: rgba(209, 209, 209, 0.46);
       font-style: normal;
+      font-size: 14px;
+      font-weight: 400;
+      letter-spacing: 0.03em;
     }
     .ob-memory-entry #memInput:focus {
       border-bottom-color: rgba(209, 209, 209, 0.55);
@@ -1142,6 +1147,17 @@
     .ob-memory-entry .ob-memory-actions {
       gap: 18px;
       margin-top: 2px;
+    }
+    .ob-memory-entry .ob-memory-or {
+      font-family: 'Inter', sans-serif;
+      font-size: 11px;
+      font-weight: 300;
+      letter-spacing: 0.18em;
+      color: rgba(209, 209, 209, 0.64);
+      text-transform: uppercase;
+      line-height: 1;
+      user-select: none;
+      pointer-events: none;
     }
     .ob-memory-entry .ob-btn {
       font-size: 11px;
@@ -1156,6 +1172,19 @@
       border-color: rgba(230, 230, 230, 0.85);
       background: rgba(255, 255, 255, 0.04);
       color: #fff;
+    }
+    .ob-memory-entry .ob-btn--primary:disabled {
+      opacity: 0.42;
+      cursor: not-allowed;
+      border-color: rgba(209, 209, 209, 0.22);
+      color: rgba(209, 209, 209, 0.5);
+      background: transparent;
+      box-shadow: none;
+    }
+    .ob-memory-entry .ob-btn--primary:disabled:hover {
+      border-color: rgba(209, 209, 209, 0.22);
+      color: rgba(209, 209, 209, 0.5);
+      background: transparent;
     }
     .ob-memory-entry .ob-btn--ghost {
       border: 1px solid rgba(209, 209, 209, 0.12);
@@ -1273,19 +1302,19 @@
       <span class="ob-cross-line ob-cross-h"></span>
       <span class="ob-cross-line ob-cross-v"></span>
       <span class="ob-cross-dot"></span>
-      <span class="ob-cross-label ob-cross-label--l">add a memory</span>
-      <span class="ob-cross-label ob-cross-label--r">that matters...</span>
+      <span class="ob-cross-label ob-cross-label--l">this is your territory</span>
+      <span class="ob-cross-label ob-cross-label--r">your memmory is safe here.</span>
     </div>
     <div class="ob-memory-form">
-      <label class="ob-memory-prompt" for="memInput">what do you remember?</label>
       <div id="inputArea" class="ob-input-area-inner">
         <input id="memInput" type="text" maxlength="140"
-               placeholder=""
+               placeholder="type here and press enter to add your memory to the void"
                autocomplete="off" spellcheck="false"/>
-        <div id="hint"> press enter to add</div>
+        <div id="hint"> press the enter  to add</div>
         <div class="ob-memory-actions">
-          <button type="button" class="ob-btn ob-btn--primary" id="addMemorySubmitBtn">add new memory</button>
-          <button type="button" class="ob-btn ob-btn--ghost" id="skipToVoidBtn">view the void</button>
+          <button type="button" class="ob-btn ob-btn--primary" id="addMemorySubmitBtn" disabled>add new memory</button>
+          <span class="ob-memory-or">OR</span>
+          <button type="button" class="ob-btn ob-btn--primary" id="skipToVoidBtn">view the void</button>
         </div>
       </div>
     </div>

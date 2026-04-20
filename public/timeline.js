@@ -79,6 +79,6 @@ function updateRawMemoryHud() {
     return;
   }
   bornEl.textContent = formatBornAgo(getMemoryBirthTime(mem));
-  const q = (mem.originalSentence || mem.sentence || '').trim();
+  const q = getEnteredMemorySentence(mem);
   quoteEl.textContent = q ? `“${q}”` : '';
 }

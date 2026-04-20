@@ -302,8 +302,7 @@ window.landingWispyBg = (() => {
       inst.renderer.render(inst.scene, inst.camera);
     } else {
       inst.renderer.setClearColor(0x060a19, 1);
-      inst.renderer.clear(true, true, true);
-    }
+      inst.renderer.clear(true, true, true);    }
   }
 
   function start() {

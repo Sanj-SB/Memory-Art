@@ -7,6 +7,13 @@
 let glyphFont;
 let _threeRetryAt = 0;
 
+function syncAddMemorySubmitState() {
+  const memInputEl = document.getElementById('memInput');
+  const addBtn = document.getElementById('addMemorySubmitBtn');
+  if (!memInputEl || !addBtn) return;
+  addBtn.disabled = memInputEl.value.trim().length === 0;
+}
+
 function ensureThreeRendererReady() {
   if (!window.threeMemoryRenderer) return false;
   if (window.threeMemoryRenderer.isReady && window.threeMemoryRenderer.isReady()) return true;
@@ -89,16 +96,29 @@ function setup() {
     appState = sents.length ? APP_STATE.INTERACT : APP_STATE.CREATE;
   });
   const saveBtn = select('#saveBtn');
-  if (saveBtn) saveBtn.mousePressed(() => saveCanvas('memory-glyphs-' + Date.now(), 'png'));
-  const memInput = select('#memInput');
-  if (memInput) memInput.elt.addEventListener('keydown', e => {
-    if (e.key !== 'Enter') return;
-    if (e.isComposing) return;
-    e.preventDefault();
-    triggerAdd();
+  if (saveBtn) saveBtn.mousePressed(() => {
+    if (typeof exportMemoryCardForCurrentMode === 'function') {
+      exportMemoryCardForCurrentMode();
+    } else {
+      saveCanvas('memory-glyphs-' + Date.now(), 'png');
+    }
   });
+  const memInput = select('#memInput');
+  if (memInput) {
+    memInput.elt.addEventListener('keydown', e => {
+      if (e.key !== 'Enter') return;
+      if (e.isComposing) return;
+      e.preventDefault();
+      triggerAdd();
+      syncAddMemorySubmitState();
+    });
+    memInput.elt.addEventListener('input', syncAddMemorySubmitState);
+  }
   const addMemorySubmitBtn = document.getElementById('addMemorySubmitBtn');
-  if (addMemorySubmitBtn) addMemorySubmitBtn.addEventListener('click', () => { triggerAdd(); });
+  if (addMemorySubmitBtn) addMemorySubmitBtn.addEventListener('click', () => {
+    triggerAdd();
+    syncAddMemorySubmitState();
+  });
   const closeIntroBtn = document.getElementById('closeIntroBtn');
   const leaveIntroBtn = document.getElementById('leaveIntroBtn');
   if (closeIntroBtn) {
@@ -160,7 +180,11 @@ function setup() {
     document.getElementById('authUsername').value = '';
     document.getElementById('authPassword').value = '';
     if (errEl) errEl.style.display = 'none';
-    if (!identityGlyphData) {
+    if (loginIsSignup) {
+      identityGlyphData = null;
+      transitionTo(APP_STATE.SYMBOL);
+      setTimeout(initSymbolDrawing, 600);
+    } else if (!identityGlyphData) {
       transitionTo(APP_STATE.SYMBOL);
       setTimeout(initSymbolDrawing, 600);
     } else {
@@ -242,6 +266,7 @@ function setup() {
     setTimeout(() => {
       const inp = document.getElementById('memInput');
       if (inp && inp.focus) inp.focus();
+      syncAddMemorySubmitState();
     }, 20);
   });
 
@@ -268,6 +293,7 @@ function setup() {
       else initHandpose();
     }
   });
+  syncAddMemorySubmitState();
 }
 
 function draw() {
@@ -317,7 +343,7 @@ function draw() {
       const mem = memories[rawFocusIdx];
       if (!mem._rawSnapshot) {
         const savedSentence = mem.sentence, savedNodes = mem.nodes, savedGlyphs = mem.glyphs;
-        mem.sentence = mem.originalSentence; rebuildNodes(rawFocusIdx);
+        mem.sentence = getEnteredMemorySentence(mem); rebuildNodes(rawFocusIdx);
         mem._rawSnapshot = { nodes: mem.nodes, glyphs: mem.glyphs };
         mem.sentence = savedSentence; mem.nodes = savedNodes; mem.glyphs = savedGlyphs;
       }

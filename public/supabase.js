@@ -48,8 +48,8 @@ async function loadProfile() {
   const { data, error } = await supabaseClient
     .from('profiles').select('*').eq('id', currentUser.id).single();
   if (error && error.code !== 'PGRST116') { console.warn('Profile load error:', error.message); return; }
-  currentProfile = data;
-  if (data && data.identity_glyph) identityGlyphData = data.identity_glyph;
+  currentProfile = data || null;
+  identityGlyphData = (data && data.identity_glyph) ? data.identity_glyph : null;
 }
 
 async function saveSymbol(glyphData) {

@@ -182,6 +182,7 @@ async function addMemory(sentence, anonymous) {
   memories.push({
     id, sentence: sentence.toLowerCase(),
     originalSentence: sentence.toLowerCase(),
+    enteredSentence: sentence.toLowerCase(),
     isAnonymous: !!anonymous,
     ownerId: currentUser ? currentUser.id : null,
     nodes, sphereR, glyphs: nodes.map((nd, i) => getGlyph(nd.charSymbol, id, i, 0)),

@@ -115,6 +115,7 @@ function updateFlowUI() {
   const symbolDone = document.getElementById('symbolDone');
   const focusNav = document.getElementById('focusNav');
   const poolCounter = document.getElementById('poolCounter');
+  const saveBtn = document.getElementById('saveBtn');
   if (!ia) return;
 
   const show = (el, v) => { if (el) el.style.display = v ? '' : 'none'; };
@@ -211,6 +212,9 @@ function updateFlowUI() {
     }
     const toFinalBtn = document.getElementById('toFinalBtn');
     if (toFinalBtn) toFinalBtn.style.display = 'none';
+    if (appState === APP_STATE.CREATE && typeof syncAddMemorySubmitState === 'function') {
+      syncAddMemorySubmitState();
+    }
     setStatus(appState === APP_STATE.CREATE ? 'add memories' : `${memories.length} memor${memories.length !== 1 ? 'ies' : 'y'}`);
   } else if (appState === APP_STATE.PREVIEW) {
     show(ia, false); show(utils, false); show(title, false);
@@ -226,6 +230,10 @@ function updateFlowUI() {
   }
   if (appState !== APP_STATE.INTERACT || interactionMode !== INTERACTION_MODE.COLLECTIVE) {
     if (typeof clearCollectiveMergeCallouts === 'function') clearCollectiveMergeCallouts();
+  }
+  if (saveBtn) {
+    const hideSaveOnStampChoice = appState === APP_STATE.PREVIEW;
+    saveBtn.style.display = hideSaveOnStampChoice ? 'none' : '';
   }
   refreshPoolCounter();
   /* Landing + auth choice both use the same wispy hero (see landing-wispy-bg.js). */
@@ -418,4 +426,321 @@ function updateMemoryLabels2D() {
   memories.forEach(mem => {
     if (mem.labelEl) mem.labelEl.style.opacity = '0';
   });
+}
+
+function createCardBase(w, h) {
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#0A0415';
+  ctx.fillRect(0, 0, w, h);
+  return { canvas, ctx };
+}
+
+function drawWrappedText(ctx, text, x, y, maxW, lineH, maxLines) {
+  const words = String(text || '').split(/\s+/).filter(Boolean);
+  const lines = [];
+  let line = '';
+  words.forEach((word) => {
+    const next = line ? `${line} ${word}` : word;
+    if (ctx.measureText(next).width <= maxW || !line) {
+      line = next;
+    } else {
+      lines.push(line);
+      line = word;
+    }
+  });
+  if (line) lines.push(line);
+  const clipped = lines.slice(0, maxLines);
+  clipped.forEach((ln, i) => ctx.fillText(ln, x, y + i * lineH));
+  return clipped.length;
+}
+
+function fitFontSizeForBox(ctx, text, maxW, maxH, startSize, minSize, family, lineHeightMul = 1.2) {
+  const sample = String(text || '').trim();
+  let size = startSize;
+  while (size >= minSize) {
+    ctx.font = `${size}px ${family}`;
+    const lineH = Math.ceil(size * lineHeightMul);
+    const words = sample.split(/\s+/).filter(Boolean);
+    let lines = 1;
+    let line = '';
+    words.forEach((word) => {
+      const next = line ? `${line} ${word}` : word;
+      if (ctx.measureText(next).width <= maxW || !line) {
+        line = next;
+      } else {
+        lines += 1;
+        line = word;
+      }
+    });
+    if (lines * lineH <= maxH) return { size, lineH };
+    size -= 2;
+  }
+  return { size: minSize, lineH: Math.ceil(minSize * lineHeightMul) };
+}
+
+function drawStampBadge(ctx, x, y, radius) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(235, 235, 240, 0.95)';
+  ctx.fill();
+  ctx.clip();
+  if (identityGlyphData && identityGlyphData.length) {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    identityGlyphData.forEach((stroke) => {
+      stroke.forEach((p) => {
+        minX = Math.min(minX, p.x);
+        minY = Math.min(minY, p.y);
+        maxX = Math.max(maxX, p.x);
+        maxY = Math.max(maxY, p.y);
+      });
+    });
+    const bw = Math.max(1, maxX - minX);
+    const bh = Math.max(1, maxY - minY);
+    const s = (radius * 1.45) / Math.max(bw, bh);
+    const ox = x - ((minX + maxX) * 0.5) * s;
+    const oy = y - ((minY + maxY) * 0.5) * s;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(18, 20, 28, 0.86)';
+    ctx.lineWidth = Math.max(1.2, radius * 0.08);
+    identityGlyphData.forEach((stroke) => {
+      if (!stroke || stroke.length < 2) return;
+      ctx.beginPath();
+      ctx.moveTo(stroke[0].x * s + ox, stroke[0].y * s + oy);
+      for (let i = 1; i < stroke.length; i++) {
+        ctx.lineTo(stroke[i].x * s + ox, stroke[i].y * s + oy);
+      }
+      ctx.stroke();
+    });
+  }
+  ctx.restore();
+}
+
+function drawCardHeaderAndFooter(ctx, w, h, timestampLabel) {
+  ctx.fillStyle = 'rgba(182, 198, 241, 0.75)';
+  ctx.font = '24px "Cormorant Garamond", serif';
+  ctx.fillText(timestampLabel, 56, 78);
+  drawStampBadge(ctx, w - 72, 66, 46);
+  ctx.fillStyle = 'rgba(246, 248, 255, 0.96)';
+  ctx.font = '56px "Playfair Display", serif';
+  ctx.fillText('IMORIA', 56, h - 42);
+}
+
+function drawSceneCrop(ctx, sourceCanvas, dx, dy, dw, dh, focusY = 0.5) {
+  if (!sourceCanvas) return;
+  const sw = sourceCanvas.width;
+  const sh = sourceCanvas.height;
+  const dstAspect = dw / Math.max(1, dh);
+  const srcAspect = sw / Math.max(1, sh);
+  let sx = 0;
+  let sy = 0;
+  let cw = sw;
+  let ch = sh;
+
+  if (srcAspect > dstAspect) {
+    cw = Math.floor(sh * dstAspect);
+    sx = Math.floor((sw - cw) * 0.5);
+  } else if (srcAspect < dstAspect) {
+    ch = Math.floor(sw / dstAspect);
+    const minY = 0;
+    const maxY = Math.max(0, sh - ch);
+    sy = Math.floor(minY + (maxY - minY) * constrain(focusY, 0, 1));
+  }
+
+  ctx.drawImage(sourceCanvas, sx, sy, cw, ch, dx, dy, dw, dh);
+}
+
+function buildExportMemoriesForMode() {
+  const R = getSphereR();
+  if (interactionMode === INTERACTION_MODE.RAW) {
+    const mem = rawFocusIdx >= 0 && rawFocusIdx < memories.length ? memories[rawFocusIdx] : null;
+    if (!mem) return { memories: [], R, leftShift: 0, collectiveSet: null };
+    let nodes = mem.nodes;
+    let glyphs = mem.glyphs;
+    if (mem._rawSnapshot && mem._rawSnapshot.nodes && mem._rawSnapshot.glyphs) {
+      nodes = mem._rawSnapshot.nodes;
+      glyphs = mem._rawSnapshot.glyphs;
+    }
+    const rawMem = { ...mem, nodes, glyphs, liveCenter: { x: 0, y: 0, z: 0 }, pos: { x: 0, y: 0, z: 0 } };
+    return { memories: [rawMem], R, leftShift: 0, collectiveSet: null };
+  }
+  if (interactionMode === INTERACTION_MODE.RECALL) {
+    const mem = rawFocusIdx >= 0 && rawFocusIdx < memories.length ? memories[rawFocusIdx] : null;
+    if (!mem) return { memories: [], R, leftShift: 0, collectiveSet: null };
+    const recallMem = { ...mem, liveCenter: { x: 0, y: 0, z: 0 }, pos: { x: 0, y: 0, z: 0 } };
+    return { memories: [recallMem], R, leftShift: 0, collectiveSet: null };
+  }
+  const set = interactionMode === INTERACTION_MODE.COLLECTIVE ? collectiveActiveIds : null;
+  return { memories: memories.slice(), R, leftShift: 0, collectiveSet: set };
+}
+
+function renderOrbCanvasForExport() {
+  const tr = window.threeMemoryRenderer;
+  if (!tr || typeof tr.captureMemoriesSnapshot !== 'function') return null;
+  const payload = buildExportMemoriesForMode();
+  return tr.captureMemoriesSnapshot({
+    width: 1024,
+    height: 1024,
+    memories: payload.memories,
+    R: payload.R,
+    rotX: curRotX,
+    rotY: curRotY,
+    camZ,
+    leftShift: payload.leftShift,
+    activeOverlap,
+    collectiveSet: payload.collectiveSet,
+    clearColor: 0x0d1a3a,
+    clearAlpha: 1
+  });
+}
+
+function formatSaveTimestamp(ts) {
+  const d = new Date(ts);
+  const day = `${d.getDate()}`.padStart(2, '0');
+  const month = `${d.getMonth() + 1}`.padStart(2, '0');
+  const year = d.getFullYear();
+  const hrs = `${d.getHours()}`.padStart(2, '0');
+  const mins = `${d.getMinutes()}`.padStart(2, '0');
+  return `${day}/${month}/${year} ${hrs}:${mins}`;
+}
+
+function latestMergeSnippet() {
+  let latest = null;
+  memories.forEach((mem) => {
+    (mem.timeline || []).forEach((entry) => {
+      if (entry.type !== 'merge') return;
+      if (!latest || entry.time > latest.time) {
+        latest = {
+          time: entry.time,
+          text: entry.text || '',
+          srcA: entry.prev || '',
+          srcB: entry.partnerSentence || ''
+        };
+      }
+    });
+  });
+  return latest;
+}
+
+function downloadCardCanvas(canvas, prefix) {
+  const a = document.createElement('a');
+  a.download = `${prefix}-${Date.now()}.png`;
+  a.href = canvas.toDataURL('image/png');
+  a.click();
+}
+
+async function exportMemoryCardForCurrentMode() {
+  const now = Date.now();
+  const timestamp = formatSaveTimestamp(now);
+  const src = renderOrbCanvasForExport();
+  const { canvas, ctx } = createCardBase(1600, 1000);
+  const w = canvas.width;
+  const h = canvas.height;
+  drawCardHeaderAndFooter(ctx, w, h, timestamp);
+
+  if (interactionMode === INTERACTION_MODE.RAW) {
+    drawSceneCrop(ctx, src, 380, 150, 840, 690);
+    const mem = rawFocusIdx >= 0 && rawFocusIdx < memories.length ? memories[rawFocusIdx] : null;
+    const text = mem ? getEnteredMemorySentence(mem) : '';
+    ctx.fillStyle = 'rgba(247, 248, 255, 0.94)';
+    const boxW = 520;
+    const boxH = 190;
+    const fit = fitFontSizeForBox(
+      ctx,
+      text,
+      boxW,
+      boxH,
+      52,
+      26,
+      '"Cormorant Garamond", serif',
+      1.12
+    );
+    const scaledSize = Math.max(18, Math.floor(fit.size * 0.75));
+    const scaledLineH = Math.max(22, Math.floor(fit.lineH * 0.75));
+    ctx.font = `${scaledSize}px "Cormorant Garamond", serif`;
+    ctx.textAlign = 'right';
+    const maxLines = Math.max(2, Math.floor(boxH / scaledLineH));
+    drawWrappedText(ctx, text, w - 56, h - 54 - (maxLines - 1) * scaledLineH, boxW, scaledLineH, maxLines);
+    ctx.textAlign = 'left';
+    downloadCardCanvas(canvas, 'imoria-raw-card');
+    return;
+  }
+
+  if (interactionMode === INTERACTION_MODE.RECALL) {
+    drawSceneCrop(ctx, src, 120, 150, 940, 700);
+    const panelScale = 1.05;
+    const panelW = Math.round(430 * panelScale);
+    const panelH = Math.round(770 * panelScale);
+    const panelX = 1120 - Math.round((panelW - 430) / 2);
+    const panelY = 120 - Math.round((panelH - 770) / 2);
+    const panelPad = 24;
+    const panelInnerW = panelW - panelPad * 2;
+    ctx.fillStyle = 'rgba(10, 20, 48, 0.95)';
+    ctx.fillRect(panelX, panelY, panelW, panelH);
+    const mem = rawFocusIdx >= 0 && rawFocusIdx < memories.length ? memories[rawFocusIdx] : null;
+    ctx.fillStyle = 'rgba(178, 194, 235, 0.72)';
+    // Timeline panel typography: use roughly +5% over in-app timeline sizing.
+    ctx.font = '10px Inter, sans-serif';
+    ctx.fillText('MEMORY TIMELINE', panelX + panelPad, panelY + 60);
+    ctx.fillText(`POOL ${collectivePoolTotal || memories.length || 0}`, panelX + panelW - 104, panelY + 60);
+    ctx.fillStyle = 'rgba(236, 239, 250, 0.93)';
+    ctx.font = '17px "Cormorant Garamond", serif';
+    const baseText = mem ? (mem.originalSentence || mem.sentence || '') : '';
+    const yOffset = drawWrappedText(ctx, `"${baseText}"`, panelX + panelPad, panelY + 98, panelInnerW, 24, 6);
+    let y = panelY + 98 + yOffset * 24 + 24;
+    ctx.strokeStyle = 'rgba(125, 150, 220, 0.22)';
+    ctx.beginPath();
+    ctx.moveTo(panelX + panelPad, y - 8);
+    ctx.lineTo(panelX + panelW - panelPad, y - 8);
+    ctx.stroke();
+    const entries = mem && mem.timeline ? mem.timeline.slice().reverse().filter((e) => e.type !== 'created') : [];
+    entries.slice(0, 3).forEach((entry) => {
+      ctx.fillStyle = 'rgba(162, 180, 235, 0.72)';
+      ctx.font = '9px Inter, sans-serif';
+      const label = entry.type === 'merge' ? 'MERGED' : 'RECALLED';
+      ctx.fillText(`${label} · ${formatTimeAgo(entry.time).toUpperCase()}`, panelX + panelPad, y + 10);
+      ctx.fillStyle = 'rgba(238, 242, 252, 0.9)';
+      ctx.font = '15px "Cormorant Garamond", serif';
+      const used = drawWrappedText(ctx, `"${entry.text || ''}"`, panelX + panelPad, y + 32, panelInnerW, 22, 4);
+      y += used * 22 + 28;
+    });
+    downloadCardCanvas(canvas, 'imoria-recall-card');
+    return;
+  }
+
+  drawSceneCrop(ctx, src, 220, 145, 960, 700, 0.5);
+  const merged = latestMergeSnippet();
+  if (merged && (activeOverlap || merged.text)) {
+    const cx = 1088;
+    const cy = 706;
+    const cardW = 470;
+    const cardH = 238;
+    const mergedAgo = formatTimeAgo(merged.time || Date.now()).toUpperCase();
+    ctx.strokeStyle = 'rgba(240, 243, 255, 0.82)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(930, 560);
+    ctx.lineTo(1000, 680);
+    ctx.lineTo(cx, 680);
+    ctx.stroke();
+
+    ctx.fillStyle = 'rgba(14, 22, 48, 0.95)';
+    ctx.fillRect(cx, cy, cardW, cardH);
+    ctx.fillStyle = 'rgba(184, 197, 235, 0.74)';
+    ctx.font = '22px Inter, sans-serif';
+    ctx.fillText(`MERGED · ${mergedAgo}`, cx + 20, cy + 36);
+    ctx.fillStyle = 'rgba(245, 248, 255, 0.95)';
+    ctx.font = '36px "Cormorant Garamond", serif';
+    const used = drawWrappedText(ctx, `"${merged.text}"`, cx + 20, cy + 82, cardW - 40, 44, 2);
+    ctx.fillStyle = 'rgba(171, 188, 233, 0.74)';
+    ctx.font = '26px Inter, sans-serif';
+    ctx.fillText('merged from:', cx + 20, cy + 102 + used * 44);
+    ctx.font = '29px "Cormorant Garamond", serif';
+    drawWrappedText(ctx, `"${merged.srcA}" + "${merged.srcB}"`, cx + 20, cy + 138 + used * 44, cardW - 40, 32, 2);
+  }
+  downloadCardCanvas(canvas, 'imoria-collective-card');
 }
