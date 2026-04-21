@@ -29,6 +29,12 @@ let pendingMemory = null;
 let mode = 'idle';
 let rawFocusIdx = 0;
 let introPopupDismissed = false;
+let signupFlowPendingStampInfo = false;
+let createEntryNeedsOpenClick = false;
+let createHideVoidButton = false;
+let voidTutorialPendingAfterGestures = false;
+let voidTutorialActive = false;
+let voidTutorialStep = 0;
 
 let handpose = null;
 let handVideo = null;

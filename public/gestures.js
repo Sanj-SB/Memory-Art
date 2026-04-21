@@ -18,6 +18,118 @@ const COLLECTIVE_OPEN_TO_ROCK_MS = 2200;
 let pinchOrbPrev = null;
 let twoHandPinchPrevDist = null;
 let lastOpenHandAt = 0;
+const VOID_TUTORIAL_STEPS = [
+  {
+    mode: 'collective',
+    kicker: 'collective',
+    title: 'collective mode',
+    copy: 'see your memories merge with others in the void. each time a memory merges the text it merged with will also reflect'
+  },
+  {
+    mode: 'recall',
+    kicker: 'recall',
+    title: 'recall mode',
+    copy: 'track your individual memories get "recalled" with a timeline view. you can also trace the history of merges the memory has gone through.'
+  },
+  {
+    mode: 'raw',
+    kicker: 'raw',
+    title: 'raw mode',
+    copy: 'view your original memories intact as they were when you entered them.'
+  },
+  {
+    mode: null,
+    kicker: 'save',
+    title: 'save',
+    copy: 'save a postcard image of your memories in the mode of your choice. let your memory exist outside the void.'
+  }
+];
+const VOID_TUTORIAL_TARGETS = {
+  collective: '#modeSwitcher .mode-btn[data-mode="collective"]',
+  recall: '#modeSwitcher .mode-btn[data-mode="recall"]',
+  raw: '#modeSwitcher .mode-btn[data-mode="raw"]',
+  save: '#saveBtn'
+};
+let voidTutorialHighlightEl = null;
+
+function getVoidTutorialSeenKey() {
+  if (!currentUser || !currentUser.id) return null;
+  return `imoria:voidTutorialSeen:${currentUser.id}`;
+}
+
+function hasSeenVoidTutorial() {
+  const k = getVoidTutorialSeenKey();
+  if (!k) return false;
+  try { return localStorage.getItem(k) === '1'; } catch { return false; }
+}
+
+function markVoidTutorialSeen() {
+  const k = getVoidTutorialSeenKey();
+  if (!k) return;
+  try { localStorage.setItem(k, '1'); } catch {}
+}
+
+function clearVoidTutorialHighlight() {
+  if (!voidTutorialHighlightEl) return;
+  voidTutorialHighlightEl.classList.remove('tutorial-highlight-target');
+  voidTutorialHighlightEl = null;
+}
+
+function setVoidTutorialHighlight(step) {
+  clearVoidTutorialHighlight();
+  const key = step && step.kicker ? step.kicker : '';
+  const selector = VOID_TUTORIAL_TARGETS[key];
+  if (!selector) return;
+  const el = document.querySelector(selector);
+  if (!el) return;
+  el.classList.add('tutorial-highlight-target');
+  voidTutorialHighlightEl = el;
+}
+
+function renderVoidTutorialStep() {
+  const step = VOID_TUTORIAL_STEPS[voidTutorialStep];
+  if (!step) return;
+  const overlay = document.getElementById('voidTutorialOverlay');
+  const kickerEl = document.getElementById('voidTutorialKicker');
+  const titleEl = document.getElementById('voidTutorialTitle');
+  const copyEl = document.getElementById('voidTutorialCopy');
+  const nextBtn = document.getElementById('voidTutorialNextBtn');
+  const closeBtn = document.getElementById('voidTutorialCloseBtn');
+  if (kickerEl) kickerEl.textContent = step.kicker;
+  if (titleEl) titleEl.textContent = step.title;
+  if (copyEl) copyEl.textContent = step.copy;
+  const isLast = voidTutorialStep === VOID_TUTORIAL_STEPS.length - 1;
+  if (nextBtn) nextBtn.style.display = isLast ? 'none' : '';
+  if (closeBtn) closeBtn.style.display = isLast ? '' : 'none';
+  if (overlay) overlay.classList.toggle('void-tutorial-overlay--save', step.kicker === 'save');
+  if (step.mode) switchMode(step.mode);
+  setVoidTutorialHighlight(step);
+}
+
+function closeVoidTutorial(markSeen = true) {
+  const el = document.getElementById('voidTutorialOverlay');
+  if (el) el.style.display = 'none';
+  if (el) el.classList.remove('void-tutorial-overlay--save');
+  clearVoidTutorialHighlight();
+  voidTutorialActive = false;
+  if (markSeen) markVoidTutorialSeen();
+}
+
+function startVoidTutorial(forceReplay = false) {
+  if (appState !== APP_STATE.INTERACT) return;
+  if (!forceReplay && hasSeenVoidTutorial()) return;
+  voidTutorialStep = 0;
+  voidTutorialActive = true;
+  const el = document.getElementById('voidTutorialOverlay');
+  if (el) el.style.display = 'flex';
+  renderVoidTutorialStep();
+}
+
+function maybeStartVoidTutorialAfterGestureChoice() {
+  if (!voidTutorialPendingAfterGestures) return;
+  voidTutorialPendingAfterGestures = false;
+  startVoidTutorial(false);
+}
 
 function setGestureTutorialStep(step) {
   const step1 = document.getElementById('gestureTutorialStep1');
@@ -40,6 +152,7 @@ function hideGestureTutorial() {
   const el = document.getElementById('gestureTutorial');
   if (el) el.style.display = 'none';
   setGestureTutorialStep(1);
+  maybeStartVoidTutorialAfterGestureChoice();
 }
 
 let handsResults = [];

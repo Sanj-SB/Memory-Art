@@ -420,6 +420,67 @@
       justify-content:center;
       flex-wrap:wrap;
     }
+    #voidTutorialOverlay {
+      z-index: 41;
+      align-items: flex-start;
+      justify-content: flex-end;
+      padding: 44px 48px;
+      background: rgba(4, 7, 18, 0.52);
+      backdrop-filter: blur(4px);
+    }
+    #voidTutorialOverlay.void-tutorial-overlay--save {
+      align-items: flex-end;
+      justify-content: flex-end;
+      padding: 0 22px 72px 22px;
+    }
+    .void-tutorial-card {
+      width: min(330px, 36vw);
+      background: rgba(12, 18, 42, 0.94);
+      border: 1px solid rgba(255, 255, 255, 0.46);
+      padding: 14px 14px 12px;
+      text-align: left;
+    }
+    .void-tutorial-kicker {
+      font-family: 'Inter', sans-serif;
+      font-size: 8px;
+      letter-spacing: 0.2em;
+      text-transform: lowercase;
+      color: rgba(200, 210, 235, 0.65);
+      margin-bottom: 10px;
+    }
+    .void-tutorial-title {
+      font-family: 'Cormorant Garamond', 'Playfair Display', serif;
+      font-style: italic;
+      font-weight: 300;
+      font-size: clamp(25px, 2.25vw, 39px);
+      letter-spacing: 0.02em;
+      line-height: 1.06;
+      color: rgba(248, 250, 255, 0.96);
+      margin: 0 0 10px;
+    }
+    .void-tutorial-copy {
+      font-family: 'Inter', sans-serif;
+      font-size: clamp(12px, 1.06vw, 16px);
+      line-height: 1.28;
+      color: rgba(238, 242, 252, 0.9);
+      margin: 0;
+    }
+    .void-tutorial-actions {
+      margin-top: 10px;
+      display: flex;
+      justify-content: flex-start;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .tutorial-highlight-target {
+      position: relative;
+      z-index: 42 !important;
+      box-shadow: 0 0 0 1px rgba(240, 245, 255, 0.9), 0 0 28px rgba(176, 196, 255, 0.42);
+      border-color: rgba(235, 242, 255, 0.88) !important;
+      color: rgba(248, 252, 255, 0.98) !important;
+      filter: none !important;
+      opacity: 1 !important;
+    }
 
     /* Mode switcher: top-right, above timeline (z-index 24 > timeline 18) */
     .mode-switcher {
@@ -1240,6 +1301,73 @@
       flex-wrap: wrap;
       justify-content: center;
     }
+    #stampInfoOverlay {
+      z-index: 86;
+      background: rgba(5, 8, 20, 0.88);
+    }
+    .stamp-info-card {
+      width: min(760px, 92vw);
+      background: rgba(10, 14, 32, 0.92);
+      border: 1px solid rgba(170, 180, 235, 0.28);
+      padding: 26px 24px;
+      color: #fff;
+    }
+    .stamp-info-head {
+      text-align: center;
+      font-family: 'Inter', sans-serif;
+      font-size: 16px;
+      line-height: 1.45;
+      font-weight: 400;
+      letter-spacing: 0.01em;
+      margin-bottom: 24px;
+    }
+    .stamp-info-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: clamp(14px, 2.4vw, 28px);
+      align-items: stretch;
+    }
+    .stamp-info-col {
+      text-align: center;
+      padding: 0 10px;
+    }
+    .stamp-info-col + .stamp-info-col {
+      border-left: 1px solid rgba(175, 188, 255, 0.35);
+    }
+    .stamp-info-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 32px;
+      letter-spacing: 0.03em;
+      color: rgba(248, 250, 255, 0.95);
+      margin: 0 0 14px;
+    }
+    .stamp-info-img {
+      width: min(280px, 38vw);
+      aspect-ratio: 1 / 1;
+      object-fit: contain;
+      display: block;
+      margin: 0 auto 14px;
+    }
+    .stamp-info-copy {
+      font-family: 'Inter', sans-serif;
+      font-size: 15px;
+      line-height: 1.4;
+      color: rgba(235, 240, 255, 0.92);
+      max-width: 24ch;
+      margin: 0 auto;
+    }
+    .stamp-info-foot {
+      margin-top: clamp(20px, 2.8vw, 30px);
+      text-align: center;
+      font-family: 'Inter', sans-serif;
+      font-size: 16px;
+      line-height: 1.45;
+      color: rgba(240, 244, 255, 0.94);
+    }
+    .stamp-info-actions {
+      margin-top: 18px;
+      text-align: center;
+    }
   </style>
 </head>
 <body>
@@ -1303,7 +1431,7 @@
       <span class="ob-cross-line ob-cross-v"></span>
       <span class="ob-cross-dot"></span>
       <span class="ob-cross-label ob-cross-label--l">this is your territory</span>
-      <span class="ob-cross-label ob-cross-label--r">your memmory is safe here.</span>
+      <span class="ob-cross-label ob-cross-label--r">your memory is safe here.</span>
     </div>
     <div class="ob-memory-form">
       <div id="inputArea" class="ob-input-area-inner">
@@ -1352,6 +1480,28 @@
   <div id="symbolDone" class="flow-actions" style="display:none; position:fixed; bottom:80px; left:50%; transform:translateX(-50%); z-index:88;">
     <button class="flow-btn" id="symbolClearBtn">Draw</button>
     <button class="flow-btn flow-btn-muted" id="symbolDoneBtn">Remain unmarked</button>
+  </div>
+
+  <div id="stampInfoOverlay" class="popup-overlay">
+    <div class="stamp-info-card">
+      <p class="stamp-info-head">Once you enter a memory you will be asked to Stamp Or Unmark it before it enters the void</p>
+      <div class="stamp-info-grid">
+        <section class="stamp-info-col">
+          <h3 class="stamp-info-title">STAMP</h3>
+          <img src="assets/stamped-sample.png" alt="Stamped memory sample" class="stamp-info-img"/>
+          <p class="stamp-info-copy">Stamped memories come with a mini orb AND a glow so they are easy to see in the void</p>
+        </section>
+        <section class="stamp-info-col">
+          <h3 class="stamp-info-title">UNMARKED</h3>
+          <img src="assets/unmarked-sample.png" alt="Unmarked memory sample" class="stamp-info-img"/>
+          <p class="stamp-info-copy">Unmarked memories will not have a glow, and will be harder to find in the void</p>
+        </section>
+      </div>
+      <p class="stamp-info-foot">All memories you enter will still be accessible to you in all modes regardless of stamped or unmarked</p>
+      <div class="stamp-info-actions">
+        <button class="ob-btn ob-btn--primary" type="button" id="stampInfoNextBtn">next</button>
+      </div>
+    </div>
   </div>
 
   <div id="previewActions" class="flow-actions" style="display:none; z-index:100; pointer-events:auto;">
@@ -1435,6 +1585,18 @@
     </div>
   </div>
 
+  <div id="voidTutorialOverlay" class="popup-overlay" style="display:none;">
+    <div class="void-tutorial-card">
+      <p id="voidTutorialKicker" class="void-tutorial-kicker">collective</p>
+      <p id="voidTutorialTitle" class="void-tutorial-title">collective mode</p>
+      <p id="voidTutorialCopy" class="void-tutorial-copy"></p>
+      <div class="void-tutorial-actions">
+        <button class="flow-btn" type="button" id="voidTutorialNextBtn">next</button>
+        <button class="flow-btn flow-btn-muted" type="button" id="voidTutorialCloseBtn" style="display:none;">close</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Mode switcher: top-right, always above timeline -->
   <div id="modeSwitcher" class="mode-switcher" style="display:none;">
     <button class="mode-btn" id="gesturesToggleBtn" title="hand gestures">gestures</button>
@@ -1480,7 +1642,10 @@
     <div class="popup-card" style="text-align:left;">
       It's 2050 - everything you say is already heard, captured, infiltrated and monetised on. Now they've come for your individual memories, skewing them to get you to remember what they want so they can push for their ways of life. That's where Imoria comes in, silent, dark, intentionally untraceable unless you own the memory. If it exists in your brain, it should be yours to own, yours to manipulate and yours to give to the world, thats our principle.<br/><br/>
       The void gives you a space to store your memories, but also watch them evolve and pick and chose which version of them you consiously use. the long term specualtion of this is that the void exists within your vrain using a brian chip, and that using hand gestures (stimulated rigth now with the camera) you can control whcih version of your memory - raw, recall or collective, you use in a situation. <br/> <br/> Pinch thumb+index and move to orbit; both hands pinched—spread apart / together for zoom. Index, middle, and little finger up (ring down) → RECALL. Open hand, then rock sign within a couple of seconds → COLLECTIVE. Closed palm → RAW.
-      <div class="popup-actions" style="justify-content:flex-end;"><button class="flow-btn flow-btn-muted" id="closeInfoBtn">close</button></div>
+      <div class="popup-actions" style="justify-content:flex-end;">
+        <button class="flow-btn" id="playVoidTutorialBtn" type="button">play tutorial</button>
+        <button class="flow-btn flow-btn-muted" id="closeInfoBtn" type="button">close</button>
+      </div>
     </div>
   </div>
 

@@ -116,6 +116,15 @@ function setup() {
   }
   const addMemorySubmitBtn = document.getElementById('addMemorySubmitBtn');
   if (addMemorySubmitBtn) addMemorySubmitBtn.addEventListener('click', () => {
+    if (createEntryNeedsOpenClick) {
+      createEntryNeedsOpenClick = false;
+      setTimeout(() => {
+        const inp = document.getElementById('memInput');
+        if (inp && inp.focus) inp.focus();
+        syncAddMemorySubmitState();
+      }, 20);
+      return;
+    }
     triggerAdd();
     syncAddMemorySubmitState();
   });
@@ -139,8 +148,20 @@ function setup() {
   const authSubmitBtn = document.getElementById('authSubmitBtn');
   const authBackBtn = document.getElementById('authBackBtn');
 
-  if (loginBtn) loginBtn.addEventListener('click', () => { loginIsSignup = false; showLoginForm('login'); });
-  if (signupBtn) signupBtn.addEventListener('click', () => { loginIsSignup = true; showLoginForm('sign up'); });
+  if (loginBtn) loginBtn.addEventListener('click', () => {
+    loginIsSignup = false;
+    signupFlowPendingStampInfo = false;
+    createEntryNeedsOpenClick = false;
+    createHideVoidButton = false;
+    showLoginForm('login');
+  });
+  if (signupBtn) signupBtn.addEventListener('click', () => {
+    loginIsSignup = true;
+    signupFlowPendingStampInfo = false;
+    createEntryNeedsOpenClick = false;
+    createHideVoidButton = false;
+    showLoginForm('sign up');
+  });
   if (authBackBtn) authBackBtn.addEventListener('click', () => { appState = APP_STATE.VOID; });
   if (authSubmitBtn) authSubmitBtn.addEventListener('click', handleAuthSubmit);
 
@@ -167,9 +188,11 @@ function setup() {
     const email = username.replace(/[^a-z0-9_-]/g, '') + '@void.memory';
     let result;
     if (loginIsSignup) {
+      voidTutorialPendingAfterGestures = true;
       result = await signUp(email, pw);
       if (!result.error) result = await signIn(email, pw);
     } else {
+      voidTutorialPendingAfterGestures = false;
       result = await signIn(email, pw);
     }
     if (result.error) {
@@ -182,14 +205,19 @@ function setup() {
     if (errEl) errEl.style.display = 'none';
     if (loginIsSignup) {
       identityGlyphData = null;
+      signupFlowPendingStampInfo = true;
       transitionTo(APP_STATE.SYMBOL);
       setTimeout(initSymbolDrawing, 600);
     } else if (!identityGlyphData) {
       transitionTo(APP_STATE.SYMBOL);
       setTimeout(initSymbolDrawing, 600);
     } else {
-      transitionTo(APP_STATE.CREATE);
-      setStatus('add your first memory');
+      if (currentUser) gestureTutorialPending = true;
+      transitionTo(APP_STATE.INTERACT);
+      mode = 'display';
+      curRotX = rotX; curRotY = rotY;
+      loadSharedIntoInteract();
+      setStatus('welcome back');
     }
   }
 
@@ -198,6 +226,7 @@ function setup() {
     identityGlyphData = null;
     const overlay = document.getElementById('symbolOverlay');
     if (overlay) overlay.style.display = 'none';
+    if (signupFlowPendingStampInfo) createHideVoidButton = true;
     appState = APP_STATE.CREATE;
     setStatus('anonymous identity active');
   });
@@ -219,6 +248,19 @@ function setup() {
     appState = APP_STATE.INTERACT; mode = 'display';
     curRotX = rotX; curRotY = rotY;
     loadSharedIntoInteract();
+  });
+  const stampInfoNextBtn = document.getElementById('stampInfoNextBtn');
+  if (stampInfoNextBtn) stampInfoNextBtn.addEventListener('click', () => {
+    signupFlowPendingStampInfo = false;
+    createEntryNeedsOpenClick = false;
+    createHideVoidButton = true;
+    appState = APP_STATE.CREATE;
+    setStatus('add your first memory');
+    setTimeout(() => {
+      const inp = document.getElementById('memInput');
+      if (inp && inp.focus) inp.focus();
+      syncAddMemorySubmitState();
+    }, 20);
   });
 
   document.querySelectorAll('.mode-btn').forEach(btn => {
@@ -258,10 +300,17 @@ function setup() {
   const infoBtn = document.getElementById('infoBtn');
   const enterMemoryQuickBtn = document.getElementById('enterMemoryQuickBtn');
   const infoOverlay = document.getElementById('infoOverlay');
+  const playVoidTutorialBtn = document.getElementById('playVoidTutorialBtn');
   const closeInfoBtn = document.getElementById('closeInfoBtn');
   if (infoBtn && infoOverlay) infoBtn.addEventListener('click', () => { infoOverlay.style.display = 'flex'; });
+  if (playVoidTutorialBtn && infoOverlay) playVoidTutorialBtn.addEventListener('click', () => {
+    infoOverlay.style.display = 'none';
+    if (typeof startVoidTutorial === 'function') startVoidTutorial(true);
+  });
   if (closeInfoBtn && infoOverlay) closeInfoBtn.addEventListener('click', () => { infoOverlay.style.display = 'none'; });
   if (enterMemoryQuickBtn) enterMemoryQuickBtn.addEventListener('click', () => {
+    createEntryNeedsOpenClick = false;
+    createHideVoidButton = false;
     appState = APP_STATE.CREATE;
     setTimeout(() => {
       const inp = document.getElementById('memInput');
@@ -272,6 +321,8 @@ function setup() {
 
   const enableGesturesBtn = document.getElementById('enableGesturesBtn');
   const gestureTutorialNextBtn = document.getElementById('gestureTutorialNextBtn');
+  const voidTutorialNextBtn = document.getElementById('voidTutorialNextBtn');
+  const voidTutorialCloseBtn = document.getElementById('voidTutorialCloseBtn');
   if (gestureTutorialNextBtn) {
     gestureTutorialNextBtn.addEventListener('click', () => {
       if (typeof setGestureTutorialStep === 'function') setGestureTutorialStep(2);
@@ -280,6 +331,13 @@ function setup() {
   if (enableGesturesBtn) enableGesturesBtn.addEventListener('click', () => { hideGestureTutorial(); initHandpose(); });
   const skipGesturesBtn = document.getElementById('skipGesturesBtn');
   if (skipGesturesBtn) skipGesturesBtn.addEventListener('click', hideGestureTutorial);
+  if (voidTutorialNextBtn) voidTutorialNextBtn.addEventListener('click', () => {
+    voidTutorialStep += 1;
+    if (typeof renderVoidTutorialStep === 'function') renderVoidTutorialStep();
+  });
+  if (voidTutorialCloseBtn) voidTutorialCloseBtn.addEventListener('click', () => {
+    if (typeof closeVoidTutorial === 'function') closeVoidTutorial(true);
+  });
   const gesturesToggleBtn = document.getElementById('gesturesToggleBtn');
   if (gesturesToggleBtn) gesturesToggleBtn.addEventListener('click', () => {
     if (gesturesEnabled) {

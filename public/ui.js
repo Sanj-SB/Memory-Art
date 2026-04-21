@@ -111,7 +111,9 @@ function updateFlowUI() {
   const modeSwitcher = document.getElementById('modeSwitcher');
   const finalActions = document.getElementById('finalActions');
   const loginOverlay = document.getElementById('loginOverlay');
+  const stampInfoOverlay = document.getElementById('stampInfoOverlay');
   const symbolOverlay = document.getElementById('symbolOverlay');
+  const voidTutorialOverlay = document.getElementById('voidTutorialOverlay');
   const symbolDone = document.getElementById('symbolDone');
   const focusNav = document.getElementById('focusNav');
   const poolCounter = document.getElementById('poolCounter');
@@ -134,7 +136,12 @@ function updateFlowUI() {
   }
 
   const skipBtn = document.getElementById('skipToVoidBtn');
+  const memInputEl = document.getElementById('memInput');
+  const hintEl = document.getElementById('hint');
+  const addBtn = document.getElementById('addMemorySubmitBtn');
+  const memoryOrEl = document.querySelector('.ob-memory-or');
   show(loginOverlay, false);
+  show(stampInfoOverlay, false);
   show(symbolOverlay, false);
   show(symbolDone, false);
   showFlex(authChoiceScreen, false);
@@ -154,6 +161,13 @@ function updateFlowUI() {
   if (modeBannerReset) modeBannerReset.style.display = 'none';
   if (onboardingTicker) onboardingTicker.style.display = 'none';
   if (handVideo) handVideo.style.display = 'none';
+  if (voidTutorialOverlay) {
+    const shouldShowVoidTutorial = appState === APP_STATE.INTERACT && voidTutorialActive;
+    voidTutorialOverlay.style.display = shouldShowVoidTutorial ? 'flex' : 'none';
+    if (!shouldShowVoidTutorial && typeof clearVoidTutorialHighlight === 'function') {
+      clearVoidTutorialHighlight();
+    }
+  }
 
   if (appState === APP_STATE.VOID) {
     show(ia, false); show(utils, false); show(title, false);
@@ -175,12 +189,29 @@ function updateFlowUI() {
     if (symbolDone) symbolDone.style.display = 'flex';
     setStatus('draw your identity symbol');
   } else if (appState === APP_STATE.CREATE || appState === APP_STATE.INTERACT) {
+    const showSignupStampInfo = appState === APP_STATE.CREATE && signupFlowPendingStampInfo;
     if (appState === APP_STATE.INTERACT && memories.length > 0 && !gestureTutorialShown && gestureTutorialPending) showGestureTutorial();
     showFlex(memoryEntryScreen, appState === APP_STATE.CREATE);
-    show(ia, appState === APP_STATE.CREATE);
+    show(ia, appState === APP_STATE.CREATE && !showSignupStampInfo);
     show(utils, appState === APP_STATE.INTERACT);
-    show(title, appState === APP_STATE.INTERACT);
-    show(skipBtn, appState === APP_STATE.CREATE);
+    show(title, appState === APP_STATE.INTERACT && !showSignupStampInfo);
+    showFlex(stampInfoOverlay, showSignupStampInfo);
+    show(skipBtn, appState === APP_STATE.CREATE && !createEntryNeedsOpenClick && !createHideVoidButton);
+    if (appState === APP_STATE.CREATE) {
+      const gate = !!createEntryNeedsOpenClick;
+      if (memInputEl) memInputEl.style.display = gate ? 'none' : '';
+      if (hintEl) hintEl.style.display = gate ? 'none' : '';
+      if (memoryOrEl) memoryOrEl.style.display = (gate || createHideVoidButton) ? 'none' : '';
+      if (addBtn) {
+        addBtn.textContent = gate ? 'enter new memory' : 'add new memory';
+        addBtn.disabled = gate ? false : ((memInputEl?.value || '').trim().length === 0);
+      }
+    } else {
+      if (memInputEl) memInputEl.style.display = '';
+      if (hintEl) hintEl.style.display = '';
+      if (memoryOrEl) memoryOrEl.style.display = '';
+      if (addBtn) addBtn.textContent = 'add new memory';
+    }
     show(modeSwitcher, appState === APP_STATE.INTERACT && memories.length > 0);
     show(poolCounter, appState === APP_STATE.INTERACT);
     const ownedCount = getOwnedIndices().length;
@@ -215,7 +246,11 @@ function updateFlowUI() {
     if (appState === APP_STATE.CREATE && typeof syncAddMemorySubmitState === 'function') {
       syncAddMemorySubmitState();
     }
-    setStatus(appState === APP_STATE.CREATE ? 'add memories' : `${memories.length} memor${memories.length !== 1 ? 'ies' : 'y'}`);
+    if (showSignupStampInfo) {
+      setStatus('stamp guide');
+    } else {
+      setStatus(appState === APP_STATE.CREATE ? 'add memories' : `${memories.length} memor${memories.length !== 1 ? 'ies' : 'y'}`);
+    }
   } else if (appState === APP_STATE.PREVIEW) {
     show(ia, false); show(utils, false); show(title, false);
     show(previewActions, true);
@@ -326,6 +361,10 @@ async function validateAndSaveSymbol() {
   await saveSymbol(glyphData);
   const overlay = document.getElementById('symbolOverlay');
   if (overlay) overlay.style.display = 'none';
+  if (signupFlowPendingStampInfo) {
+    createEntryNeedsOpenClick = false;
+    createHideVoidButton = true;
+  }
   appState = APP_STATE.CREATE;
   setStatus('add your first memory');
 }
