@@ -190,12 +190,12 @@ function updateFlowUI() {
     setStatus('draw your identity symbol');
   } else if (appState === APP_STATE.CREATE || appState === APP_STATE.INTERACT) {
     const showSignupStampInfo = appState === APP_STATE.CREATE && signupFlowPendingStampInfo;
-    if (appState === APP_STATE.INTERACT && memories.length > 0 && !gestureTutorialShown && gestureTutorialPending) showGestureTutorial();
+    if (appState === APP_STATE.INTERACT && !gestureTutorialShown && gestureTutorialPending) showGestureTutorial();
     showFlex(memoryEntryScreen, appState === APP_STATE.CREATE);
     show(ia, appState === APP_STATE.CREATE && !showSignupStampInfo);
     show(utils, appState === APP_STATE.INTERACT);
     show(title, appState === APP_STATE.INTERACT && !showSignupStampInfo);
-    showFlex(stampInfoOverlay, showSignupStampInfo);
+    show(stampInfoOverlay, showSignupStampInfo);
     show(skipBtn, appState === APP_STATE.CREATE && !createEntryNeedsOpenClick && !createHideVoidButton);
     if (appState === APP_STATE.CREATE) {
       const gate = !!createEntryNeedsOpenClick;

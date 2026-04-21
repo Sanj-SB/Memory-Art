@@ -690,6 +690,84 @@
       text-transform: lowercase;
       padding: 10px 16px;
     }
+    .info-reference-popup {
+      width: min(980px, 96vw);
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      text-align: left;
+      padding: 24px 30px;
+      color: rgba(240, 244, 255, 0.95);
+    }
+    .info-ref-top {
+      text-align: center;
+    }
+    .info-ref-title {
+      font-family: 'Inter', sans-serif;
+      font-size: 36px;
+      line-height: 1.25;
+      letter-spacing: 0.01em;
+      color: rgba(245, 245, 255, 0.96);
+      margin: 0;
+    }
+    .info-ref-copy {
+      margin-top: 16px;
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+      line-height: 1.55;
+      letter-spacing: 0.01em;
+      color: rgba(238, 242, 252, 0.92);
+      text-align: center;
+      white-space: nowrap;
+    }
+    .info-ref-grid {
+      margin-top: 24px;
+      display: grid;
+      grid-template-columns: 1.25fr 1fr 2.05fr;
+      column-gap: 20px;
+      row-gap: 14px;
+      align-items: center;
+    }
+    .info-ref-label {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 24px;
+      letter-spacing: 0.03em;
+      color: rgba(245, 245, 255, 0.95);
+      line-height: 1.08;
+      white-space: nowrap;
+    }
+    .info-ref-gesture {
+      width: 100%;
+      max-width: 140px;
+      height: 86px;
+      object-fit: contain;
+      justify-self: center;
+      display: block;
+    }
+    .info-ref-instruction {
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+      line-height: 1.35;
+      color: rgba(236, 236, 249, 0.95);
+      white-space: nowrap;
+    }
+    .info-ref-footer {
+      margin-top: 18px;
+      font-family: 'Cormorant Garamond', serif;
+      font-style: italic;
+      font-size: 27px;
+      letter-spacing: 0.02em;
+      text-align: center;
+      color: rgba(178, 182, 210, 0.85);
+    }
+    .info-ref-actions {
+      margin-top: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+    }
 
     #handVideo { position:fixed; bottom:90px; left:24px; width:120px; height:90px; object-fit:cover; border-radius:4px; border:1px solid rgba(150,165,210,0.2); z-index:14; }
 
@@ -1639,10 +1717,34 @@
   <div id="canvas-container"></div>
 
   <div id="infoOverlay" class="popup-overlay" style="z-index:35;">
-    <div class="popup-card" style="text-align:left;">
-      It's 2050 - everything you say is already heard, captured, infiltrated and monetised on. Now they've come for your individual memories, skewing them to get you to remember what they want so they can push for their ways of life. That's where Imoria comes in, silent, dark, intentionally untraceable unless you own the memory. If it exists in your brain, it should be yours to own, yours to manipulate and yours to give to the world, thats our principle.<br/><br/>
-      The void gives you a space to store your memories, but also watch them evolve and pick and chose which version of them you consiously use. the long term specualtion of this is that the void exists within your vrain using a brian chip, and that using hand gestures (stimulated rigth now with the camera) you can control whcih version of your memory - raw, recall or collective, you use in a situation. <br/> <br/> Pinch thumb+index and move to orbit; both hands pinched—spread apart / together for zoom. Index, middle, and little finger up (ring down) → RECALL. Open hand, then rock sign within a couple of seconds → COLLECTIVE. Closed palm → RAW.
-      <div class="popup-actions" style="justify-content:flex-end;">
+    <div class="gesture-wizard info-reference-popup">
+      <div class="info-ref-top">
+        <p class="info-ref-copy" style="margin-top:0;">Welcome to Imoria | Year 2050</p>
+        <p class="info-ref-copy">Remember you memory is safe here. It's yours to own and yours to track.</p>
+      </div>
+      <div class="info-ref-grid">
+        <p class="info-ref-label">RAW</p>
+        <img src="assets/raw.svg" alt="Raw gesture" class="info-ref-gesture"/>
+        <p class="info-ref-instruction">a closed fist</p>
+
+        <p class="info-ref-label">RECALL</p>
+        <img src="assets/recall.svg" alt="Recall gesture" class="info-ref-gesture"/>
+        <p class="info-ref-instruction">touch your ring and thumb</p>
+
+        <p class="info-ref-label">COLLECTIVE</p>
+        <img src="assets/collective.svg" alt="Collective gesture" class="info-ref-gesture"/>
+        <p class="info-ref-instruction">open palm and then rock</p>
+
+        <p class="info-ref-label">VOID<br/>CONTROL</p>
+        <img src="assets/rotate.svg" alt="Rotate control" class="info-ref-gesture"/>
+        <p class="info-ref-instruction">pinch your thumb and index to rotate the memory</p>
+
+        <p class="info-ref-label"></p>
+        <img src="assets/zoom-in-and-out.svg" alt="Zoom control" class="info-ref-gesture"/>
+        <p class="info-ref-instruction">use both hands together to zoom in and out</p>
+      </div>
+      <p class="info-ref-instruction">A thesis project by Sanjana Bhoopathi</p>
+      <div class="info-ref-actions">
         <button class="flow-btn" id="playVoidTutorialBtn" type="button">play tutorial</button>
         <button class="flow-btn flow-btn-muted" id="closeInfoBtn" type="button">close</button>
       </div>

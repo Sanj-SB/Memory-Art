@@ -209,8 +209,12 @@ function setup() {
       transitionTo(APP_STATE.SYMBOL);
       setTimeout(initSymbolDrawing, 600);
     } else if (!identityGlyphData) {
-      transitionTo(APP_STATE.SYMBOL);
-      setTimeout(initSymbolDrawing, 600);
+      if (currentUser) gestureTutorialPending = true;
+      transitionTo(APP_STATE.INTERACT);
+      mode = 'display';
+      curRotX = rotX; curRotY = rotY;
+      loadSharedIntoInteract();
+      setStatus('welcome back');
     } else {
       if (currentUser) gestureTutorialPending = true;
       transitionTo(APP_STATE.INTERACT);
@@ -305,7 +309,9 @@ function setup() {
   if (infoBtn && infoOverlay) infoBtn.addEventListener('click', () => { infoOverlay.style.display = 'flex'; });
   if (playVoidTutorialBtn && infoOverlay) playVoidTutorialBtn.addEventListener('click', () => {
     infoOverlay.style.display = 'none';
-    if (typeof startVoidTutorial === 'function') startVoidTutorial(true);
+    gestureTutorialShown = false;
+    gestureTutorialPending = true;
+    if (typeof showGestureTutorial === 'function') showGestureTutorial();
   });
   if (closeInfoBtn && infoOverlay) closeInfoBtn.addEventListener('click', () => { infoOverlay.style.display = 'none'; });
   if (enterMemoryQuickBtn) enterMemoryQuickBtn.addEventListener('click', () => {
