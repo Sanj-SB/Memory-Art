@@ -151,6 +151,7 @@ function setup() {
   if (loginBtn) loginBtn.addEventListener('click', () => {
     loginIsSignup = false;
     signupFlowPendingStampInfo = false;
+    signupRequiresFirstMemory = false;
     createEntryNeedsOpenClick = false;
     createHideVoidButton = false;
     showLoginForm('login');
@@ -158,11 +159,17 @@ function setup() {
   if (signupBtn) signupBtn.addEventListener('click', () => {
     loginIsSignup = true;
     signupFlowPendingStampInfo = false;
+    signupRequiresFirstMemory = true;
     createEntryNeedsOpenClick = false;
     createHideVoidButton = false;
     showLoginForm('sign up');
   });
-  if (authBackBtn) authBackBtn.addEventListener('click', () => { appState = APP_STATE.VOID; });
+  if (authBackBtn) authBackBtn.addEventListener('click', () => {
+    signupFlowPendingStampInfo = false;
+    signupRequiresFirstMemory = false;
+    createHideVoidButton = false;
+    appState = APP_STATE.VOID;
+  });
   if (authSubmitBtn) authSubmitBtn.addEventListener('click', handleAuthSubmit);
 
   const authPassword = document.getElementById('authPassword');
@@ -206,8 +213,11 @@ function setup() {
     if (loginIsSignup) {
       identityGlyphData = null;
       signupFlowPendingStampInfo = true;
-      transitionTo(APP_STATE.SYMBOL);
-      setTimeout(initSymbolDrawing, 600);
+      // Signup-only: avoid delayed transition race that can overwrite
+      // CREATE after stamp confirmation and trap users on symbol screen.
+      appState = APP_STATE.SYMBOL;
+      if (typeof updateFlowUI === 'function') updateFlowUI();
+      setTimeout(initSymbolDrawing, 20);
     } else if (!identityGlyphData) {
       if (currentUser) gestureTutorialPending = true;
       transitionTo(APP_STATE.INTERACT);
@@ -230,8 +240,12 @@ function setup() {
     identityGlyphData = null;
     const overlay = document.getElementById('symbolOverlay');
     if (overlay) overlay.style.display = 'none';
-    if (signupFlowPendingStampInfo) createHideVoidButton = true;
+    if (signupRequiresFirstMemory) {
+      signupFlowPendingStampInfo = true;
+      createHideVoidButton = true;
+    }
     appState = APP_STATE.CREATE;
+    if (typeof updateFlowUI === 'function') updateFlowUI();
     setStatus('anonymous identity active');
   });
   const symbolClearBtn = document.getElementById('symbolClearBtn');
@@ -248,7 +262,9 @@ function setup() {
   });
   const skipToVoidBtn = document.getElementById('skipToVoidBtn');
   if (skipToVoidBtn) skipToVoidBtn.addEventListener('click', () => {
+    if (signupRequiresFirstMemory) return;
     if (currentUser) gestureTutorialPending = true;
+    signupRequiresFirstMemory = false;
     appState = APP_STATE.INTERACT; mode = 'display';
     curRotX = rotX; curRotY = rotY;
     loadSharedIntoInteract();

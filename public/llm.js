@@ -52,6 +52,14 @@ async function checkLLM() {
   const healthUrl = llmHealthUrl();
   console.log(`[DEBUG:LLM] Checking LLM health at ${healthUrl}`);
   const indicator = document.getElementById('llmStatus');
+  // In local static dev (e.g. :5500), only probe localhost proxy if explicitly enabled.
+  // This avoids noisy ERR_CONNECTION_REFUSED when no proxy is running.
+  if (isLocalDev() && typeof window !== 'undefined' && !window.__ENABLE_LOCAL_LLM_PROXY__) {
+    llmAvailable = false;
+    if (indicator) indicator.textContent = '';
+    console.log('[DEBUG:LLM] Local proxy check skipped (set window.__ENABLE_LOCAL_LLM_PROXY__ = true to enable)');
+    return;
+  }
   try {
     const res = await fetch(healthUrl, { signal: AbortSignal.timeout(2000) });
     if (!res.ok) throw new Error('health check failed');

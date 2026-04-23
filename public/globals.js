@@ -32,6 +32,7 @@ let introPopupDismissed = false;
 let signupFlowPendingStampInfo = false;
 let createEntryNeedsOpenClick = false;
 let createHideVoidButton = false;
+let signupRequiresFirstMemory = false;
 let voidTutorialPendingAfterGestures = false;
 let voidTutorialActive = false;
 let voidTutorialStep = 0;

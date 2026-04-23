@@ -195,13 +195,14 @@ function updateFlowUI() {
     show(ia, appState === APP_STATE.CREATE && !showSignupStampInfo);
     show(utils, appState === APP_STATE.INTERACT);
     show(title, appState === APP_STATE.INTERACT && !showSignupStampInfo);
-    show(stampInfoOverlay, showSignupStampInfo);
-    show(skipBtn, appState === APP_STATE.CREATE && !createEntryNeedsOpenClick && !createHideVoidButton);
+    showFlex(stampInfoOverlay, showSignupStampInfo);
+  const hideVoidEntryDuringSignup = signupRequiresFirstMemory || createHideVoidButton;
+  show(skipBtn, appState === APP_STATE.CREATE && !createEntryNeedsOpenClick && !hideVoidEntryDuringSignup);
     if (appState === APP_STATE.CREATE) {
       const gate = !!createEntryNeedsOpenClick;
       if (memInputEl) memInputEl.style.display = gate ? 'none' : '';
       if (hintEl) hintEl.style.display = gate ? 'none' : '';
-      if (memoryOrEl) memoryOrEl.style.display = (gate || createHideVoidButton) ? 'none' : '';
+      if (memoryOrEl) memoryOrEl.style.display = (gate || hideVoidEntryDuringSignup) ? 'none' : '';
       if (addBtn) {
         addBtn.textContent = gate ? 'enter new memory' : 'add new memory';
         addBtn.disabled = gate ? false : ((memInputEl?.value || '').trim().length === 0);
@@ -345,28 +346,34 @@ function showSymbolError() {
 }
 
 async function validateAndSaveSymbol() {
-  if (authStrokes.length < 2) { symbolError = 'draw at least two strokes'; showSymbolError(); return; }
+  // Be permissive: users often draw a single continuous stamp stroke.
+  if (authStrokes.length < 1) { symbolError = 'draw your stamp first'; showSymbolError(); return; }
   const totalPts = authStrokes.reduce((s, st) => s + st.length, 0);
-  if (totalPts < 35) { symbolError = 'draw more — at least 35 points'; showSymbolError(); return; }
+  if (totalPts < 8) { symbolError = 'draw a little more so we can save your stamp'; showSymbolError(); return; }
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
   authStrokes.flat().forEach(p => {
     minX = min(minX, p.x); maxX = max(maxX, p.x);
     minY = min(minY, p.y); maxY = max(maxY, p.y);
   });
   const w = maxX - minX, h = maxY - minY;
-  if (w < 5 || h < 5) { symbolError = 'draw something larger'; showSymbolError(); return; }
-  const aspect = max(w, h) / max(min(w, h), 1);
-  if (aspect > 8) { symbolError = 'avoid letter-like shapes (too narrow)'; showSymbolError(); return; }
+  if (w < 3 || h < 3) { symbolError = 'draw something a little larger'; showSymbolError(); return; }
   const glyphData = authStrokes.map(s => s.map(p => ({ x: p.x, y: p.y })));
-  await saveSymbol(glyphData);
+  // Critical: never block UI progression on network/storage latency.
+  identityGlyphData = glyphData;
   const overlay = document.getElementById('symbolOverlay');
   if (overlay) overlay.style.display = 'none';
-  if (signupFlowPendingStampInfo) {
+  if (signupRequiresFirstMemory) {
+    signupFlowPendingStampInfo = true;
     createEntryNeedsOpenClick = false;
     createHideVoidButton = true;
   }
   appState = APP_STATE.CREATE;
+  if (typeof updateFlowUI === 'function') updateFlowUI();
   setStatus('add your first memory');
+  // Persist stamp in background.
+  saveSymbol(glyphData).catch((e) => {
+    console.warn('Symbol save failed (background):', e);
+  });
 }
 
 function doStampPreview() {
@@ -379,6 +386,9 @@ function doStampPreview() {
   previewMemCache = null;
   previewMemCacheSentence = '';
   isAnonymous = false;
+  signupRequiresFirstMemory = false;
+  createHideVoidButton = false;
+  signupFlowPendingStampInfo = false;
   if (currentUser) gestureTutorialPending = true;
   transitionTo(APP_STATE.INTERACT);
   mode = 'display';

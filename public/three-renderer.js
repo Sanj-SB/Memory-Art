@@ -49,8 +49,6 @@ const threeMemoryRenderer = (() => {
     if (threeLoadStarted) return false;
     threeLoadStarted = true;
     const moduleSources = [
-      './three.module.min.js',
-      '/three.module.min.js',
       'https://cdn.jsdelivr.net/npm/three@0.183.2/build/three.module.min.js',
       'https://unpkg.com/three@0.183.2/build/three.module.min.js',
     ];

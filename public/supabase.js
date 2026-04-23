@@ -46,7 +46,7 @@ async function signOut() {
 async function loadProfile() {
   if (!supabaseClient || !currentUser) return;
   const { data, error } = await supabaseClient
-    .from('profiles').select('*').eq('id', currentUser.id).single();
+    .from('profiles').select('*').eq('id', currentUser.id).maybeSingle();
   if (error && error.code !== 'PGRST116') { console.warn('Profile load error:', error.message); return; }
   currentProfile = data || null;
   identityGlyphData = (data && data.identity_glyph) ? data.identity_glyph : null;
