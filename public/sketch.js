@@ -374,10 +374,29 @@ function setup() {
     }
   });
   syncAddMemorySubmitState();
+
+  // Audio layer binds to existing buttons/events only; no control logic replaced.
+  if (window.imoriaAudioReactivity && typeof window.imoriaAudioReactivity.bind === 'function') {
+    window.imoriaAudioReactivity.bind();
+  }
+  if (window.imoriaAudioManager && typeof window.imoriaAudioManager.init === 'function') {
+    window.imoriaAudioManager.init();
+  }
 }
 
 function draw() {
   clear();
+  if (window.imoriaAudioReactivity && typeof window.imoriaAudioReactivity.updateFrame === 'function') {
+    window.imoriaAudioReactivity.updateFrame({
+      appState,
+      mode,
+      camZ,
+      rotX,
+      rotY,
+      isDragging,
+      introPopupDismissed
+    });
+  }
   ensureThreeRendererReady();
   if (interactionMode === INTERACTION_MODE.COLLECTIVE) {
     const didReshuffle = reshuffleCollectiveSelection(false);

@@ -21,6 +21,7 @@ function mouseDragged() {
   rotX -= (mouseY - lastMY) * 0.007;
   rotX = constrain(rotX, -PI * 0.42, PI * 0.42);
   lastMX = mouseX; lastMY = mouseY;
+  if (window.imoriaAudioReactivity) window.imoriaAudioReactivity.noteInteraction(0.35);
 }
 
 function mouseReleased() {
@@ -44,7 +45,10 @@ function mouseReleased() {
 }
 
 function mouseWheel(e) {
-  if (mode === 'display') camZ = constrain(camZ + e.delta * 0.4, -400, 800);
+  if (mode === 'display') {
+    camZ = constrain(camZ + e.delta * 0.4, -400, 800);
+    if (window.imoriaAudioReactivity) window.imoriaAudioReactivity.noteInteraction(0.25);
+  }
   return false;
 }
 

@@ -296,7 +296,11 @@ window.landingWispyBg = (() => {
     const inst = ensureActiveInstance();
     if (!inst) return;
     inst.heroMat.uniforms.uTime.value = now * 0.001;
-    inst.heroMat.uniforms.uMotion.value = motionScale();
+    const pulse =
+      window.imoriaAudioManager && typeof window.imoriaAudioManager.getEyePulseBoost === 'function'
+        ? window.imoriaAudioManager.getEyePulseBoost()
+        : 0;
+    inst.heroMat.uniforms.uMotion.value = motionScale() + pulse * 0.35;
     const showHero = inst.heroMat.uniforms.uShowHero.value > 0.5;
     if (!showHero || textureReady || inst.heroMat.uniforms.uMap.value) {
       inst.renderer.render(inst.scene, inst.camera);

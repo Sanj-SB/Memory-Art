@@ -313,6 +313,7 @@ function tryApplyPinchOrbit(kp) {
     rotY += dx * HAND_ORBIT_SENS;
     rotX -= dy * HAND_ORBIT_SENS;
     rotX = Math.max(-ROT_X_LIMIT, Math.min(ROT_X_LIMIT, rotX));
+    if (window.imoriaAudioReactivity) window.imoriaAudioReactivity.noteInteraction(0.28);
   }
   pinchOrbPrev = { x: cx, y: cy };
   return true;
@@ -331,6 +332,10 @@ function tryApplyTwoHandPinchZoom(stA, stB) {
       let deltaCam = -dSep * TWO_HAND_ZOOM_SENS;
       if (dSep > 0) deltaCam *= 1.35;
       camZ = Math.max(CAM_Z_MIN, Math.min(CAM_Z_MAX, camZ + deltaCam));
+      if (window.imoriaAudioReactivity) {
+        const strength = Math.min(0.55, 0.12 + Math.abs(dSep) * 0.01);
+        window.imoriaAudioReactivity.noteInteraction(strength);
+      }
       label = dSep > 0 ? 'two-hand · zoom in' : 'two-hand · zoom out';
     }
   }

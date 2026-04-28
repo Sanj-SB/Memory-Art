@@ -3,6 +3,7 @@
 function switchMode(m) {
   const prevMode = interactionMode;
   console.log(`[DEBUG:MODE] switchMode called: "${prevMode}" → "${m}"`);
+  const audioManager = window.imoriaAudioManager || null;
   if (prevMode === INTERACTION_MODE.COLLECTIVE && m !== 'collective' &&
       typeof clearCollectiveMergeCallouts === 'function') {
     clearCollectiveMergeCallouts();
@@ -24,18 +25,21 @@ function switchMode(m) {
   }
   if (m === 'raw') {
     interactionMode = INTERACTION_MODE.RAW;
+    if (audioManager) audioManager.setMemoryMode('raw');
     const fi = firstOwnedMemory();
     rawFocusIdx = fi >= 0 ? fi : 0;
     console.log(`[DEBUG:MODE] Entered RAW mode, focusIdx=${rawFocusIdx}`);
     setStatus('raw · original memory');
   } else if (m === 'recall') {
     interactionMode = INTERACTION_MODE.RECALL;
+    if (audioManager) audioManager.setMemoryMode('recall');
     const fi = firstOwnedMemory();
     rawFocusIdx = fi >= 0 ? fi : 0;
     console.log(`[DEBUG:MODE] Entered RECALL mode, focusIdx=${rawFocusIdx}`);
     setStatus('recall · memory subtly altered');
   } else if (m === 'collective') {
     interactionMode = INTERACTION_MODE.COLLECTIVE;
+    if (audioManager) audioManager.setMemoryMode('collective');
     console.log(`[DEBUG:MODE] Entered COLLECTIVE mode — memories will attract & merge`);
     loadSharedIntoInteract();
     reshuffleCollectiveSelection(true);
@@ -43,8 +47,14 @@ function switchMode(m) {
     setStatus('collective · rotating memory subset');
   } else {
     interactionMode = INTERACTION_MODE.FLOAT;
+    if (audioManager) audioManager.setMemoryMode('raw');
     console.log(`[DEBUG:MODE] Entered FLOAT mode`);
     setStatus('floating · memories drift in space');
+  }
+  if (audioManager && typeof audioManager.triggerModeSwitchChime === 'function') {
+    audioManager.triggerModeSwitchChime(m);
+  } else if (audioManager && typeof audioManager.triggerInteractionChime === 'function') {
+    audioManager.triggerInteractionChime(0.62);
   }
   document.querySelectorAll('.mode-btn[data-mode]').forEach(b => {
     b.classList.remove('active');

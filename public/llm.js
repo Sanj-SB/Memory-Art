@@ -346,6 +346,11 @@ No extra commentary.`;
         typeof notifyCollectiveMergeIfUserOwned === 'function') {
       notifyCollectiveMergeIfUserOwned(miA, miB, srcA, srcB);
     }
+    if (interactionMode === INTERACTION_MODE.COLLECTIVE &&
+        window.imoriaAudioManager &&
+        typeof window.imoriaAudioManager.playMergeSound === 'function') {
+      window.imoriaAudioManager.playMergeSound();
+    }
     memA.isMerging = false;
     memB.isMerging = false;
     memA.cooldown = COOL_FRAMES;
