@@ -124,8 +124,20 @@
     bindGlobalUnlockListeners() {
       if (this._globalUnlockBound) return;
       this._globalUnlockBound = true;
+      const isEditableTarget = (target) => {
+        if (!target || !(target instanceof Element)) return false;
+        if (target.isContentEditable) return true;
+        const tag = target.tagName;
+        return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+      };
       const tryUnlock = (e) => {
-        try { if (e && typeof e.preventDefault === 'function') e.preventDefault(); } catch {}
+        if (e && e.type === 'keydown') {
+          if (isEditableTarget(e.target)) return;
+          const key = e.key;
+          const isKeyboardActivate = key === 'Enter' || key === ' ';
+          if (!isKeyboardActivate) return;
+          try { if (typeof e.preventDefault === 'function') e.preventDefault(); } catch {}
+        }
         if (!windowObj.imoriaAudioManager) return;
         if (windowObj.imoriaAudioManager.unlocked) return;
         windowObj.imoriaAudioManager.unlockAndStart({ source: 'global' });
