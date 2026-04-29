@@ -119,6 +119,7 @@ function updateFlowUI() {
   const onboardingTicker = document.getElementById('onboardingTicker');
   const previewActions = document.getElementById('previewActions');
   const modeSwitcher = document.getElementById('modeSwitcher');
+  const voidPullMenuRoot = document.getElementById('voidPullMenuRoot');
   const finalActions = document.getElementById('finalActions');
   const loginOverlay = document.getElementById('loginOverlay');
   const stampInfoOverlay = document.getElementById('stampInfoOverlay');
@@ -159,6 +160,7 @@ function updateFlowUI() {
   showFlex(memoryEntryScreen, false);
   show(previewActions, false);
   show(modeSwitcher, false);
+  show(voidPullMenuRoot, false);
   show(finalActions, false);
   show(focusNav, false);
   show(poolCounter, false);
@@ -182,6 +184,7 @@ function updateFlowUI() {
   if (appState === APP_STATE.VOID) {
     show(ia, false); show(utils, false); show(title, false);
     if (onboardingTicker) onboardingTicker.style.display = 'block';
+    show(voidPullMenuRoot, false);
     if (!introPopupDismissed) {
       showFlex(landingScreen, true);
     } else {
@@ -205,6 +208,7 @@ function updateFlowUI() {
     show(ia, appState === APP_STATE.CREATE && !showSignupStampInfo);
     show(utils, appState === APP_STATE.INTERACT);
     show(title, appState === APP_STATE.INTERACT && !showSignupStampInfo);
+    show(voidPullMenuRoot, appState === APP_STATE.INTERACT);
     showFlex(stampInfoOverlay, showSignupStampInfo);
   const hideVoidEntryDuringSignup = signupRequiresFirstMemory || createHideVoidButton;
   show(skipBtn, appState === APP_STATE.CREATE && !createEntryNeedsOpenClick && !hideVoidEntryDuringSignup);
@@ -293,6 +297,9 @@ function updateFlowUI() {
       lwb.stop();
     }
   }
+
+  // Keep the void menu collapsed when we leave the void experience.
+  if (voidPullMenuRoot && appState !== APP_STATE.INTERACT) voidPullMenuRoot.classList.remove('open');
 }
 
 // Symbol drawing
@@ -492,7 +499,7 @@ function createCardBase(w, h) {
   canvas.width = w;
   canvas.height = h;
   const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#0A0415';
+  ctx.fillStyle = '#060A19';
   ctx.fillRect(0, 0, w, h);
   return { canvas, ctx };
 }
@@ -692,7 +699,23 @@ function downloadCardCanvas(canvas, prefix) {
   a.click();
 }
 
-async function exportMemoryCardForCurrentMode() {
+function canvasToBlob(canvas, type = 'image/png', quality) {
+  return new Promise((resolve, reject) => {
+    if (!canvas || typeof canvas.toBlob !== 'function') {
+      reject(new Error('Canvas export unavailable'));
+      return;
+    }
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        reject(new Error('Failed to generate image blob'));
+        return;
+      }
+      resolve(blob);
+    }, type, quality);
+  });
+}
+
+function buildMemoryCardForCurrentMode() {
   const now = Date.now();
   const timestamp = formatSaveTimestamp(now);
   const src = renderOrbCanvasForExport();
@@ -725,8 +748,7 @@ async function exportMemoryCardForCurrentMode() {
     const maxLines = Math.max(2, Math.floor(boxH / scaledLineH));
     drawWrappedText(ctx, text, w - 56, h - 54 - (maxLines - 1) * scaledLineH, boxW, scaledLineH, maxLines);
     ctx.textAlign = 'left';
-    downloadCardCanvas(canvas, 'imoria-raw-card');
-    return;
+    return { canvas, prefix: 'imoria-raw-card' };
   }
 
   if (interactionMode === INTERACTION_MODE.RECALL) {
@@ -767,8 +789,7 @@ async function exportMemoryCardForCurrentMode() {
       const used = drawWrappedText(ctx, `"${entry.text || ''}"`, panelX + panelPad, y + 32, panelInnerW, 22, 4);
       y += used * 22 + 28;
     });
-    downloadCardCanvas(canvas, 'imoria-recall-card');
-    return;
+    return { canvas, prefix: 'imoria-recall-card' };
   }
 
   drawSceneCrop(ctx, src, 220, 145, 960, 700, 0.5);
@@ -801,5 +822,18 @@ async function exportMemoryCardForCurrentMode() {
     ctx.font = '29px "Cormorant Garamond", serif';
     drawWrappedText(ctx, `"${merged.srcA}" + "${merged.srcB}"`, cx + 20, cy + 138 + used * 44, cardW - 40, 32, 2);
   }
-  downloadCardCanvas(canvas, 'imoria-collective-card');
+  return { canvas, prefix: 'imoria-collective-card' };
+}
+
+async function exportMemoryCardBlobForCurrentMode() {
+  const result = buildMemoryCardForCurrentMode();
+  if (!result || !result.canvas) throw new Error('Failed to build postcard');
+  const blob = await canvasToBlob(result.canvas);
+  return { ...result, blob };
+}
+
+async function exportMemoryCardForCurrentMode() {
+  const result = buildMemoryCardForCurrentMode();
+  if (!result || !result.canvas) return;
+  downloadCardCanvas(result.canvas, result.prefix);
 }

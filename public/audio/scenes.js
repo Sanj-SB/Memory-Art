@@ -394,27 +394,27 @@
         scale: ['C5', 'Eb5', 'G5', 'Bb5', 'D6', 'F6']
       },
       recall: {
-        density: 0.24,
-        brightness: 0.58,
-        metallic: 0.42,
+        density: 0.19,
+        brightness: 0.54,
+        metallic: 0.38,
         stereoWidth: 0.42,
-        delayWet: 0.28,
-        reverbWet: 0.8,
-        windLevel: 0.46,
-        motifChance: 0.22,
-        clusterChance: 0.24,
+        delayWet: 0.18,
+        reverbWet: 0.66,
+        windLevel: 0.28,
+        motifChance: 0.18,
+        clusterChance: 0.20,
         scale: ['C5', 'E5', 'G5', 'A5', 'B5', 'D6', 'E6']
       },
       collective: {
-        density: 0.34,
-        brightness: 0.66,
-        metallic: 0.34,
-        stereoWidth: 0.72,
-        delayWet: 0.34,
-        reverbWet: 0.86,
-        windLevel: 0.52,
-        motifChance: 0.14,
-        clusterChance: 0.42,
+        density: 0.26,
+        brightness: 0.62,
+        metallic: 0.3,
+        stereoWidth: 0.6,
+        delayWet: 0.28,
+        reverbWet: 0.78,
+        windLevel: 0.42,
+        motifChance: 0.1,
+        clusterChance: 0.26,
         scale: ['C5', 'E5', 'G5', 'B5', 'D6', 'E6', 'G6', 'B6']
       }
     };
@@ -432,11 +432,17 @@
 
     function fireChime(time, note, velocity, pan) {
       chimePan.pan.setValueAtTime(pan, time);
-      chime.triggerAttackRelease(note, '16n', time, velocity);
-      if (Math.random() < 0.22 + modeConfig.metallic * 0.34 && time >= nextShimmerAt) {
+      const recallVelocityScale = modeName === 'recall' ? 0.65 : 1;
+      const v = velocity * recallVelocityScale;
+      chime.triggerAttackRelease(note, '16n', time, v);
+      const shimmerBaseProb = 0.22 + modeConfig.metallic * 0.34;
+      const shimmerProb = modeName === 'collective'
+        ? shimmerBaseProb * 0.55
+        : (modeName === 'recall' ? shimmerBaseProb * 0.7 : shimmerBaseProb);
+      if (Math.random() < shimmerProb && time >= nextShimmerAt) {
         shimmer.frequency.setValueAtTime(430 + Math.random() * 420, time + 0.01);
         try {
-          shimmer.triggerAttackRelease('64n', time + 0.01, velocity * 0.32);
+          shimmer.triggerAttackRelease('64n', time + 0.01, v * 0.32);
           nextShimmerAt = time + 0.24;
         } catch (e) {
           // MetalSynth is monophonic and can throw on overlapping starts.
@@ -467,7 +473,8 @@
           if (voice.volume) voice.volume.value = -12 + strength * 7;
         } else if (modeName === 'recall') {
           voice.playbackRate = 0.95 + Math.random() * 0.12 + movementRateBump * 0.8;
-          if (voice.volume) voice.volume.value = -10 + strength * 7;
+          // Boost the "second sound" in recall so it stands out over the wind chime layer.
+          if (voice.volume) voice.volume.value = -6.5 + strength * 7.5;
         } else {
           voice.playbackRate = 1.02 + Math.random() * 0.26 + movementRateBump;
           if (voice.volume) voice.volume.value = -8 + strength * 8;
@@ -503,7 +510,10 @@
         }
         if (ambienceLoopId == null) {
           ambienceLoopId = Tone.Transport.scheduleRepeat((time) => {
-            if (Math.random() < 0.42) {
+            const ambProb = modeName === 'collective'
+              ? 0.28
+              : (modeName === 'recall' ? 0.35 : 0.42);
+            if (Math.random() < ambProb) {
               const note = randomOf(modeConfig.scale);
               fireChime(time + Math.random() * 0.3, note, 0.13 + accentStrength * 0.05, (Math.random() * 2 - 1) * modeConfig.stereoWidth * 0.75);
             }

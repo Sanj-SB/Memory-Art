@@ -692,7 +692,7 @@
       padding: 10px 16px;
     }
     .info-reference-popup {
-      width: min(980px, 96vw);
+      width: min(760px, 92vw);
       min-height: 0;
       display: flex;
       flex-direction: column;
@@ -769,6 +769,116 @@
       align-items: center;
       gap: 16px;
     }
+    .save-modal-card {
+      width: min(760px, 92vw);
+      background: rgba(10, 14, 32, 0.94);
+      border: 1px solid rgba(170, 180, 235, 0.28);
+      padding: 26px 24px;
+      color: #fff;
+    }
+    .save-modal-title {
+      margin: 0;
+      text-align: center;
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 34px;
+      letter-spacing: 0.03em;
+      color: rgba(245, 245, 255, 0.96);
+    }
+    .save-modal-subtitle {
+      margin-top: 14px;
+      text-align: center;
+      font-family: 'Inter', sans-serif;
+      font-size: 15px;
+      line-height: 1.5;
+      color: rgba(236, 236, 249, 0.92);
+    }
+    .save-modal-actions {
+      margin-top: 28px;
+      display: flex;
+      justify-content: center;
+      gap: 18px;
+      flex-wrap: wrap;
+    }
+    .save-modal-actions .flow-btn {
+      min-width: 220px;
+    }
+    .save-modal-body {
+      margin-top: 26px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 240px;
+    }
+    .save-modal-loading {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+    .save-spinner {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      border: 2px solid rgba(170, 180, 235, 0.24);
+      border-top-color: rgba(235, 242, 255, 0.92);
+      animation: save-spin 0.8s linear infinite;
+    }
+    @keyframes save-spin {
+      to { transform: rotate(360deg); }
+    }
+    .save-modal-error {
+      margin-top: 18px;
+      text-align: center;
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      line-height: 1.5;
+      color: rgba(255, 160, 160, 0.95);
+      min-height: 20px;
+    }
+    .save-qr-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 18px;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: opacity 0.35s ease, transform 0.35s ease;
+    }
+    .save-qr-wrap.is-visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .save-qr-canvas {
+      width: min(280px, 68vw);
+      height: auto;
+      background: #fff;
+      padding: 12px;
+      border-radius: 8px;
+      box-shadow: 0 0 24px rgba(140, 120, 220, 0.14);
+    }
+    .save-modal-back-row {
+      margin-top: 26px;
+      display: flex;
+      justify-content: center;
+    }
+    @media (max-width: 640px) {
+      .save-modal-card {
+        padding: 22px 18px;
+      }
+      .save-modal-title {
+        font-size: 28px;
+      }
+      .save-modal-subtitle {
+        font-size: 14px;
+      }
+      .save-modal-actions {
+        gap: 14px;
+      }
+      .save-modal-actions .flow-btn {
+        width: 100%;
+        min-width: 0;
+      }
+    }
 
     #handVideo { position:fixed; bottom:90px; left:24px; width:120px; height:90px; object-fit:cover; border-radius:4px; border:1px solid rgba(150,165,210,0.2); z-index:14; }
 
@@ -802,6 +912,152 @@
     #timelinePanel::-webkit-scrollbar { width: 3px; }
     #timelinePanel::-webkit-scrollbar-track { background: transparent; }
     #timelinePanel::-webkit-scrollbar-thumb { background: rgba(140,120,220,0.2); border-radius: 2px; }
+
+    /* Void: left pull-out menu */
+    #voidPullMenuRoot {
+      --void-pull-menu-open-w: clamp(120px, calc(100vw / 6), 190px); /* ~1/6 screen */
+      --void-pull-menu-tab-w: 34px;
+      --void-pull-menu-h: min(46vh, 295px); /* 2/3 of previous height */
+      position: fixed;
+      left: 0;
+      top: calc(50% - clamp(40px, 5vh, 80px));
+      transform: translateY(-50%);
+      height: var(--void-pull-menu-h);
+      width: var(--void-pull-menu-tab-w);
+      z-index: 19;
+      pointer-events: auto;
+    }
+    #voidPullMenuRoot.open { pointer-events: auto; width: var(--void-pull-menu-open-w); }
+    #voidPullMenuPanel {
+      position: absolute;
+      left: 0;
+      top: 0;
+      height: 100%;
+      width: var(--void-pull-menu-open-w);
+      background: #060A19;
+      border: 1px solid rgba(255,255,255,0.12);
+      border-left: 0;
+      border-radius: 0 14px 14px 0;
+      overflow-y: auto;
+      overflow-x: hidden;
+      /* Fully hide panel; tab remains visible at the left edge */
+      transform: translateX(calc(-1 * var(--void-pull-menu-open-w)));
+      transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+      pointer-events: none;
+    }
+    #voidPullMenuRoot.open #voidPullMenuPanel {
+      transform: translateX(0);
+      pointer-events: auto;
+    }
+
+    #voidPullMenuPanel::-webkit-scrollbar { width: 4px; }
+    #voidPullMenuPanel::-webkit-scrollbar-track { background: transparent; }
+    #voidPullMenuPanel::-webkit-scrollbar-thumb { background: rgba(140,120,220,0.25); border-radius: 999px; }
+
+    #voidPullMenuTab {
+      position: absolute;
+      left: 0;
+      top: 0;
+      height: 100%;
+      width: var(--void-pull-menu-tab-w);
+      background: #060A19;
+      border: 1px solid rgba(255,255,255,0.12);
+      border-left: 0;
+      border-radius: 0 14px 14px 0;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      pointer-events: auto;
+      transition: opacity 0.2s ease;
+    }
+    #voidPullMenuRoot.open #voidPullMenuTab {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .void-pull-menu-tab-text {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 11px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: rgba(240, 244, 255, 0.92);
+      writing-mode: vertical-rl;
+      transform: rotate(180deg);
+      user-select: none;
+    }
+
+    #voidManualCloseBtn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 2;
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 0;
+      background: transparent;
+      color: rgba(255,255,255,0.85);
+      cursor: pointer;
+      pointer-events: auto;
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 18px;
+      line-height: 1;
+      padding: 0;
+    }
+
+    #voidManualCloseBtn:active {
+      transform: translateY(1px);
+    }
+
+    .void-pull-menu-content {
+      height: 100%;
+      display: grid;
+      grid-template-columns: 0.42fr 0.58fr;
+      pointer-events: none;
+    }
+
+    .void-pull-menu-icons-col {
+      background: #060A19;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 14px 0;
+      gap: 14px;
+    }
+
+    .void-pull-menu-icon {
+      width: 53px;
+      height: 53px;
+      object-fit: contain;
+      flex: 0 0 auto;
+    }
+
+    .void-pull-menu-divider {
+      width: 82%;
+      height: 1px;
+      background: rgba(140,120,220,0.7);
+      margin: 0;
+      flex: 0 0 auto;
+    }
+
+    .void-pull-menu-text-col {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 16px 18px 14px 18px;
+    }
+
+    .void-pull-menu-text-item {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 11px;
+      line-height: 1.1;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.92);
+      user-select: none;
+    }
 
     .tl-header {
       font-family: 'Inter', sans-serif; font-size: 9px;
@@ -859,7 +1115,7 @@
       left: 0;
       right: 0;
       height: 40px;
-      background: #f08080;
+      background: #F65758;
       z-index: 90;
       overflow: hidden;
       display: none;
@@ -872,7 +1128,7 @@
     }
     .onboarding-ticker-seg {
       flex-shrink: 0;
-      padding-right: 3rem;
+      padding-right: 0;
       font-family: 'Playfair Display', 'Cormorant Garamond', serif;
       font-size: 13px;
       font-weight: 400;
@@ -984,6 +1240,10 @@
     }
     .ob-landing-copy p + p {
       margin-top: 0.65em;
+    }
+    .ob-landing-copy p:first-child + p {
+      /* Tighter spacing between the first two hero lines */
+      margin-top: 0.35em;
     }
     .ob-landing-copy .ob-landing-break {
       margin-top: 1.35em;
@@ -1458,8 +1718,8 @@
 
   <div id="onboardingTicker" class="onboarding-ticker" aria-hidden="true">
     <div class="onboarding-ticker-track">
-      <span class="onboarding-ticker-seg">| RULE <span class="ticker-lower">central</span> | YR 2050 ALERT | RULE <span class="ticker-lower">central</span> | YR 2050 ALERT | RULE <span class="ticker-lower">central</span> | YR 2050 ALERT | RULE <span class="ticker-lower">central</span> | </span>
-      <span class="onboarding-ticker-seg" aria-hidden="true">| RULE <span class="ticker-lower">central</span> | YR 2050 ALERT | RULE <span class="ticker-lower">central</span> | YR 2050 ALERT | RULE <span class="ticker-lower">central</span> | YR 2050 ALERT | RULE <span class="ticker-lower">central</span> | </span>
+      <span class="onboarding-ticker-seg">RULE : CENTRAL | YEAR 2050 ALERT | RULE : CENTRAL | YEAR 2050 ALERT RULE : CENTRAL | YEAR 2050 ALERT RULE : CENTRAL | YEAR 2050 ALERT</span>
+      <span class="onboarding-ticker-seg" aria-hidden="true">RULE : CENTRAL | YEAR 2050 ALERT RULE : CENTRAL | YEAR 2050 ALERT RULE : CENTRAL | YEAR 2050 ALERT RULE : CENTRAL | YEAR 2050 ALERT</span>
     </div>
   </div>
 
@@ -1713,42 +1973,141 @@
     <div class="tl-entries" id="tlEntries"></div>
   </div>
 
+  <div id="voidPullMenuRoot" class="void-pull-menu" style="display:none;">
+    <button type="button" id="voidPullMenuTab" class="void-pull-menu-tab" aria-label="Open manual" aria-expanded="false">
+      <span class="void-pull-menu-tab-text">manual</span>
+    </button>
+    <div id="voidPullMenuPanel" class="void-pull-menu-panel" aria-label="Manual pull-out menu">
+      <button type="button" id="voidManualCloseBtn" aria-label="Collapse manual menu">×</button>
+      <div class="void-pull-menu-content">
+        <div class="void-pull-menu-icons-col" aria-hidden="true">
+          <img class="void-pull-menu-icon" src="assets/raw.svg" alt=""/>
+          <div class="void-pull-menu-divider"></div>
+          <img class="void-pull-menu-icon" src="assets/recall.svg" alt=""/>
+          <div class="void-pull-menu-divider"></div>
+          <img class="void-pull-menu-icon" src="assets/collective.svg" alt=""/>
+          <div class="void-pull-menu-divider"></div>
+          <img class="void-pull-menu-icon" src="assets/rotate.svg" alt=""/>
+          <div class="void-pull-menu-divider"></div>
+          <img class="void-pull-menu-icon" src="assets/zoom-in-and-out.svg" alt=""/>
+        </div>
+        <div class="void-pull-menu-text-col" aria-hidden="true">
+          <div class="void-pull-menu-text-item">RAW</div>
+          <div class="void-pull-menu-text-item">RECALL</div>
+          <div class="void-pull-menu-text-item">COLLECTIVE</div>
+          <div class="void-pull-menu-text-item">ROTATE</div>
+          <div class="void-pull-menu-text-item">ZOOM</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div id="collectiveMergeLayer" class="collective-merge-layer"></div>
 
   <div id="canvas-container"></div>
 
   <div id="infoOverlay" class="popup-overlay" style="z-index:35;">
-    <div class="gesture-wizard info-reference-popup">
-      <div class="info-ref-top">
-        <p class="info-ref-copy" style="margin-top:0;">Welcome to Imoria | Year 2050</p>
-        <p class="info-ref-copy">Remember you memory is safe here. It's yours to own and yours to track.</p>
+    <div class="gesture-wizard info-reference-popup" style="text-align:center;">
+      <p class="info-ref-copy" style="margin-top:0; font-size:14px; letter-spacing:0.01em; color:rgba(245,245,255,0.96); white-space:nowrap;">
+        Welcome to Imoria | Year 2050
+      </p>
+
+      <p class="info-ref-copy" style="margin-top:22px; font-size:15px; font-weight:300; line-height:1.65; color:rgba(238,242,252,0.92); white-space:normal;">
+        Our memories are ours to own - reclaim what once was yours.<br/>
+        Imoria gives you access to 3 forms of your memory, use them wisely.
+      </p>
+
+      <div class="gesture-grid" style="margin-top:48px;">
+        <div class="gesture-col" style="min-height:auto;">
+          <h3 class="gesture-mode" style="font-size:26px; letter-spacing:0.03em;">RAW</h3>
+          <p class="gesture-copy" style="white-space:normal;">
+            Your memory in its<br/>
+            original form as you<br/>
+            entered it
+          </p>
+        </div>
+
+        <div class="gesture-col" style="min-height:auto;">
+          <h3 class="gesture-mode" style="font-size:26px; letter-spacing:0.03em;">RECALL</h3>
+          <p class="gesture-copy" style="white-space:normal;">
+            Your memory mildly altered<br/>
+            each time, as your brain<br/>
+            biologically would
+          </p>
+        </div>
+
+        <div class="gesture-col" style="min-height:auto;">
+          <h3 class="gesture-mode" style="font-size:26px; letter-spacing:0.03em;">COLLECTIVE</h3>
+          <p class="gesture-copy" style="white-space:normal;">
+            Your memory altered based<br/>
+            on it&apos;s interactions with<br/>
+            other memories in the void
+          </p>
+        </div>
       </div>
-      <div class="info-ref-grid">
-        <p class="info-ref-label">RAW</p>
-        <img src="assets/raw.svg" alt="Raw gesture" class="info-ref-gesture"/>
-        <p class="info-ref-instruction">a closed fist</p>
 
-        <p class="info-ref-label">RECALL</p>
-        <img src="assets/recall.svg" alt="Recall gesture" class="info-ref-gesture"/>
-        <p class="info-ref-instruction">touch your ring and thumb</p>
+      <p class="info-ref-copy" style="margin-top:40px; font-size:15px; color:rgba(178,182,210,0.85); font-style:italic; white-space:nowrap;">
+        A thesis project by Sanjana Bhoopathi
+      </p>
 
-        <p class="info-ref-label">COLLECTIVE</p>
-        <img src="assets/collective.svg" alt="Collective gesture" class="info-ref-gesture"/>
-        <p class="info-ref-instruction">open palm and then rock</p>
-
-        <p class="info-ref-label">VOID<br/>CONTROL</p>
-        <img src="assets/rotate.svg" alt="Rotate control" class="info-ref-gesture"/>
-        <p class="info-ref-instruction">pinch your thumb and index to rotate the memory</p>
-
-        <p class="info-ref-label"></p>
-        <img src="assets/zoom-in-and-out.svg" alt="Zoom control" class="info-ref-gesture"/>
-        <p class="info-ref-instruction">use both hands together to zoom in and out</p>
+      <div style="margin-top:54px; display:flex; justify-content:space-between; align-items:center; gap:20px;">
+        <button
+          class="flow-btn"
+          id="popupSoundToggleBtn"
+          type="button"
+          style="padding:10px 22px; font-size:12px; letter-spacing:0.22em; border-color:rgba(220,230,255,0.45); color:rgba(248,252,255,0.96); background:transparent; border-radius:0;"
+        >
+          sound on
+        </button>
+        <button
+          class="flow-btn flow-btn-muted"
+          id="closeInfoBtn"
+          type="button"
+          style="padding:10px 22px; font-size:12px; letter-spacing:0.22em; border-color:rgba(220,230,255,0.45); color:rgba(248,252,255,0.9); background:transparent; border-radius:0;"
+        >
+          close
+        </button>
       </div>
-      <p class="info-ref-instruction">A thesis project by Sanjana Bhoopathi</p>
-      <div class="info-ref-actions">
-        <button class="flow-btn" id="playVoidTutorialBtn" type="button">play tutorial</button>
-        <button class="flow-btn flow-btn-muted" id="closeInfoBtn" type="button">close</button>
+    </div>
+  </div>
+
+  <div id="saveOverlay" class="popup-overlay" style="z-index:36;">
+    <div class="save-modal-card">
+      <div id="saveModalChoiceView">
+        <p class="save-modal-title">Save Your Postcard</p>
+        <p class="save-modal-subtitle">Choose where you want to save your postcard.</p>
+        <div class="save-modal-actions">
+          <button class="flow-btn" id="downloadToLaptopBtn" type="button">Download to Laptop</button>
+          <button class="flow-btn flow-btn-muted" id="saveOnPhoneBtn" type="button">Scan QR to Save on Phone</button>
+          <button class="flow-btn flow-btn-muted" id="closeSaveOverlayBtn" type="button">Close</button>
+        </div>
       </div>
+
+      <div id="saveModalLoadingView" style="display:none;">
+        <p class="save-modal-title">Preparing Save</p>
+        <p class="save-modal-subtitle">Uploading your postcard and generating a QR code.</p>
+        <div class="save-modal-body">
+          <div class="save-modal-loading">
+            <div class="save-spinner" aria-hidden="true"></div>
+            <p class="save-modal-subtitle" style="margin-top:0;">Please wait a moment...</p>
+          </div>
+        </div>
+      </div>
+
+      <div id="saveModalQrView" style="display:none;">
+        <p class="save-modal-title">Save on Phone</p>
+        <p class="save-modal-subtitle">Scan this QR code to open your postcard.</p>
+        <div class="save-modal-body">
+          <div id="saveQrWrap" class="save-qr-wrap">
+            <canvas id="saveQrCanvas" class="save-qr-canvas"></canvas>
+          </div>
+        </div>
+        <div class="save-modal-back-row">
+          <button class="flow-btn flow-btn-muted" id="saveModalBackBtn" type="button">Back</button>
+        </div>
+      </div>
+
+      <div id="saveModalError" class="save-modal-error"></div>
     </div>
   </div>
 
@@ -1784,6 +2143,8 @@
   <script src="audio/audioManager.js"></script>
   <script src="audio/reactivity.js"></script>
   <script src="ui.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
+  <script src="save.js"></script>
   <script src="interaction.js"></script>
   <script src="sketch.js"></script>
 </body>

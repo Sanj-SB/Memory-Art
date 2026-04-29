@@ -97,7 +97,9 @@ function setup() {
   });
   const saveBtn = select('#saveBtn');
   if (saveBtn) saveBtn.mousePressed(() => {
-    if (typeof exportMemoryCardForCurrentMode === 'function') {
+    if (typeof openSaveModal === 'function') {
+      openSaveModal();
+    } else if (typeof exportMemoryCardForCurrentMode === 'function') {
       exportMemoryCardForCurrentMode();
     } else {
       saveCanvas('memory-glyphs-' + Date.now(), 'png');
@@ -320,16 +322,37 @@ function setup() {
   const infoBtn = document.getElementById('infoBtn');
   const enterMemoryQuickBtn = document.getElementById('enterMemoryQuickBtn');
   const infoOverlay = document.getElementById('infoOverlay');
-  const playVoidTutorialBtn = document.getElementById('playVoidTutorialBtn');
   const closeInfoBtn = document.getElementById('closeInfoBtn');
+  const popupSoundToggleBtn = document.getElementById('popupSoundToggleBtn');
   if (infoBtn && infoOverlay) infoBtn.addEventListener('click', () => { infoOverlay.style.display = 'flex'; });
-  if (playVoidTutorialBtn && infoOverlay) playVoidTutorialBtn.addEventListener('click', () => {
-    infoOverlay.style.display = 'none';
-    gestureTutorialShown = false;
-    gestureTutorialPending = true;
-    if (typeof showGestureTutorial === 'function') showGestureTutorial();
-  });
   if (closeInfoBtn && infoOverlay) closeInfoBtn.addEventListener('click', () => { infoOverlay.style.display = 'none'; });
+
+  // `?` popup sound toggle (no fixed "enable sound" button elsewhere).
+  if (popupSoundToggleBtn) {
+    const syncPopupSoundToggle = () => {
+      const mgr = window.imoriaAudioManager;
+      if (!mgr) return;
+      const soundOn = mgr.unlocked && !mgr.muted;
+      popupSoundToggleBtn.textContent = soundOn ? 'sound on' : 'sound off';
+    };
+    syncPopupSoundToggle();
+    if (window.imoriaAudioManager && typeof window.imoriaAudioManager.on === 'function') {
+      window.imoriaAudioManager.on('sound:state', syncPopupSoundToggle);
+    }
+    popupSoundToggleBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const mgr = window.imoriaAudioManager;
+      if (!mgr) return;
+      const soundOn = mgr.unlocked && !mgr.muted;
+      if (soundOn) {
+        mgr.setMuted(true);
+      } else {
+        // User intent: enable sound. Set preference before unlocking.
+        mgr.setMuted(false);
+        mgr.unlockAndStart({ source: 'popupSoundToggle' });
+      }
+    });
+  }
   if (enterMemoryQuickBtn) enterMemoryQuickBtn.addEventListener('click', () => {
     createEntryNeedsOpenClick = false;
     createHideVoidButton = false;
@@ -373,6 +396,33 @@ function setup() {
       else initHandpose();
     }
   });
+
+  // Void left pull-out menu (RAW/RECALL/COLLECTIVE + ROTATE/ZOOM)
+  const voidPullMenuRoot = document.getElementById('voidPullMenuRoot');
+  const voidPullMenuTab = document.getElementById('voidPullMenuTab');
+  const voidPullMenuPanel = document.getElementById('voidPullMenuPanel');
+  const voidManualCloseBtn = document.getElementById('voidManualCloseBtn');
+  if (voidPullMenuRoot && voidPullMenuTab && voidPullMenuPanel) {
+    const setOpen = (v) => {
+      voidPullMenuRoot.classList.toggle('open', !!v);
+      voidPullMenuTab.setAttribute('aria-expanded', v ? 'true' : 'false');
+    };
+
+    setOpen(false);
+
+    voidPullMenuTab.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isOpen = voidPullMenuRoot.classList.contains('open');
+      setOpen(!isOpen);
+    });
+
+    if (voidManualCloseBtn) {
+      voidManualCloseBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        setOpen(false);
+      });
+    }
+  }
   syncAddMemorySubmitState();
 
   // Audio layer binds to existing buttons/events only; no control logic replaced.
@@ -381,6 +431,19 @@ function setup() {
   }
   if (window.imoriaAudioManager && typeof window.imoriaAudioManager.init === 'function') {
     window.imoriaAudioManager.init();
+  }
+
+  // Best-effort: start audio as soon as the page loads.
+  // Many browsers will still block until a user gesture, but we try anyway.
+  if (window.imoriaAudioManager && typeof window.imoriaAudioManager.unlockAndStart === 'function') {
+    const mgr = window.imoriaAudioManager;
+    if (!mgr.unlocked) {
+      // Prefer "sound on" at load; if blocked, the manager will switch to muted.
+      if (typeof mgr.setMuted === 'function') mgr.setMuted(false);
+      setTimeout(() => {
+        mgr.unlockAndStart({ source: 'autostart:load' });
+      }, 0);
+    }
   }
 }
 

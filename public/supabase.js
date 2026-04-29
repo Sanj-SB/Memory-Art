@@ -19,6 +19,57 @@ function initSupabase() {
   }
 }
 
+function getSupabaseClient() {
+  return supabaseClient;
+}
+
+async function uploadPostcardBlobAndGetSignedUrl(blob) {
+  if (!blob) throw new Error('No postcard image to upload');
+  if (!supabaseClient || !supabaseClient.storage) throw new Error('No connection');
+
+  const bucketName = 'postcards';
+  const uniqueId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  const filePath = `exports/postcard-${uniqueId}.png`;
+
+  const uploadRes = await supabaseClient.storage
+    .from(bucketName)
+    .upload(filePath, blob, {
+      contentType: 'image/png',
+      cacheControl: '3600',
+      upsert: false
+    });
+
+  if (uploadRes.error) {
+    const msg = uploadRes.error.message || 'unknown error';
+    if (/bucket.*not.*found|not found/i.test(msg)) {
+      throw new Error('Supabase upload failed: Storage bucket "postcards" was not found.');
+    }
+    if (/row-level security|permission|not allowed|unauthorized|forbidden/i.test(msg)) {
+      throw new Error('Supabase upload failed: Storage policy denied upload for this user/session.');
+    }
+    throw new Error(`Supabase upload failed: ${msg}`);
+  }
+
+  const { data, error } = await supabaseClient.storage
+    .from(bucketName)
+    .createSignedUrl(filePath, 60 * 60 * 24);
+
+  if (error) {
+    const msg = error.message || 'unknown error';
+    if (/row-level security|permission|not allowed|unauthorized|forbidden/i.test(msg)) {
+      throw new Error('Signed URL failed: Storage policy denied read/sign access.');
+    }
+    throw new Error(`Signed URL failed: ${msg}`);
+  }
+  if (!data || !data.signedUrl) throw new Error('Could not create signed URL');
+
+  return {
+    bucketName,
+    filePath,
+    signedUrl: data.signedUrl
+  };
+}
+
 async function signUp(email, password) {
   if (!supabaseClient) return { error: 'No connection' };
   const { data, error } = await supabaseClient.auth.signUp({ email, password });

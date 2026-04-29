@@ -24,6 +24,7 @@
       this.rawCtx = null;
       this._globalUnlockBound = false;
       this.transportWatchdogTimer = null;
+      this.unlockWatchdogTimer = null;
     }
 
     ensureEnableOverlay() {
@@ -199,6 +200,16 @@
       }
       if (this.unlocking) return;
       this.unlocking = true;
+      if (this.unlockWatchdogTimer) {
+        clearTimeout(this.unlockWatchdogTimer);
+        this.unlockWatchdogTimer = null;
+      }
+      this.unlockWatchdogTimer = windowObj.setTimeout(() => {
+        if (!this.unlocking) return;
+        console.warn('[IMORIA AUDIO] unlock watchdog: clearing stuck unlock state');
+        this.unlocking = false;
+        this.showEnableOverlay('Unlock is taking longer than expected. Click again to enable sound.');
+      }, 7000);
 
       // Keep the call stack as "gesture-clean" as possible:
       // attempt to create/set a fresh context, then start immediately.
@@ -331,12 +342,20 @@
           this.startTransportWatchdog();
           this.debugReport('unlock:done');
           this.emit('sound:state', { unlocked: this.unlocked, muted: this.muted });
+          if (this.unlockWatchdogTimer) {
+            clearTimeout(this.unlockWatchdogTimer);
+            this.unlockWatchdogTimer = null;
+          }
           this.unlocking = false;
         } catch (setupErr) {
           console.warn('[IMORIA AUDIO] post-unlock setup failed:', setupErr);
           this.showEnableOverlay('Audio unlocked, but scene setup failed. Retry.');
           this.muted = true;
           this.emit('sound:state', { unlocked: this.unlocked, muted: this.muted });
+          if (this.unlockWatchdogTimer) {
+            clearTimeout(this.unlockWatchdogTimer);
+            this.unlockWatchdogTimer = null;
+          }
           this.unlocking = false;
         }
       }).catch((err) => {
@@ -356,6 +375,10 @@
         this.muted = true;
         this.emit('sound:state', { unlocked: this.unlocked, muted: this.muted });
         this.showEnableOverlay('Click to enable sound (blocked).');
+        if (this.unlockWatchdogTimer) {
+          clearTimeout(this.unlockWatchdogTimer);
+          this.unlockWatchdogTimer = null;
+        }
         this.unlocking = false;
       });
     }
