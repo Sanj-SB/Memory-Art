@@ -84,6 +84,10 @@
         cursor: 'pointer',
       });
       const onGesture = (e) => {
+        if (!e) return;
+        const isKeyboardActivate = e.type === 'keydown' && (e.key === 'Enter' || e.key === ' ');
+        if (e.type === 'keydown' && !isKeyboardActivate) return;
+        if (typeof e.preventDefault === 'function') e.preventDefault();
         this.unlockAndStart({
           source: 'overlay',
           eventType: e && e.type,
@@ -91,8 +95,11 @@
           userActivation: !!(navigator && navigator.userActivation && navigator.userActivation.isActive),
         });
       };
-      // Keep this simple: one trusted click path is most reliable.
-      btn.addEventListener('click', onGesture);
+      // Safari/iOS can drop click-based audio unlocks; bind multiple gesture paths.
+      btn.addEventListener('pointerup', onGesture, { passive: false });
+      btn.addEventListener('touchend', onGesture, { passive: false });
+      btn.addEventListener('click', onGesture, { passive: false });
+      btn.addEventListener('keydown', onGesture);
       card.appendChild(title);
       card.appendChild(note);
       card.appendChild(btn);
@@ -136,7 +143,6 @@
       this.onboarding = windowObj.ImoriaAudioScenes.createOnboardingScene(Tone, this.limiter);
       this.voidScene = windowObj.ImoriaAudioScenes.createVoidScene(Tone, this.limiter);
       this.voidScene.setMemoryMode(this.currentMemoryMode);
-      this.createMuteButton();
       this.on('landing:drone-hit', () => {
         this.eyePulseUntil = performance.now() + 900;
         this.eyePulseBoost = 0.22;
@@ -217,6 +223,8 @@
           console.log('[IMORIA AUDIO] rawCtx state after resume attempt:', raw && raw.state);
           if (!raw || raw.state !== 'running') {
             this.showEnableOverlay('Browser blocked audio. Click again on page, then this button.');
+            this.muted = true;
+            this.emit('sound:state', { unlocked: this.unlocked, muted: this.muted });
             this.unlocking = false;
             return;
           }
@@ -249,6 +257,8 @@
       } catch (e) {
         console.warn('[IMORIA AUDIO] Raw WebAudio beep failed:', e);
         this.showEnableOverlay('Audio context failed. Click once on page, then retry.');
+        this.muted = true;
+        this.emit('sound:state', { unlocked: this.unlocked, muted: this.muted });
         this.unlocking = false;
         return;
       }
@@ -276,7 +286,8 @@
           this.unlocked = true;
           console.log('[IMORIA AUDIO] Audio unlocked');
           if (Tone.Destination) {
-            Tone.Destination.mute = false;
+            // Respect current mute preference (popup toggles `this.muted`).
+            Tone.Destination.mute = !!this.muted;
             if (Tone.Destination.volume && typeof Tone.Destination.volume.rampTo === 'function') {
               Tone.Destination.volume.rampTo(-2, 0.25);
             }
@@ -298,6 +309,8 @@
           const ok = this.initEngine();
           if (!ok) {
             this.showEnableOverlay('Audio unlocked, but scenes not loaded yet.');
+            this.muted = true;
+            this.emit('sound:state', { unlocked: this.unlocked, muted: this.muted });
             this.unlocking = false;
             return;
           }
@@ -317,10 +330,13 @@
           this.hideEnableOverlay();
           this.startTransportWatchdog();
           this.debugReport('unlock:done');
+          this.emit('sound:state', { unlocked: this.unlocked, muted: this.muted });
           this.unlocking = false;
         } catch (setupErr) {
           console.warn('[IMORIA AUDIO] post-unlock setup failed:', setupErr);
           this.showEnableOverlay('Audio unlocked, but scene setup failed. Retry.');
+          this.muted = true;
+          this.emit('sound:state', { unlocked: this.unlocked, muted: this.muted });
           this.unlocking = false;
         }
       }).catch((err) => {
@@ -337,6 +353,8 @@
             }).catch(() => {});
           }
         } catch {}
+        this.muted = true;
+        this.emit('sound:state', { unlocked: this.unlocked, muted: this.muted });
         this.showEnableOverlay('Click to enable sound (blocked).');
         this.unlocking = false;
       });
@@ -412,6 +430,7 @@
 
     setMuted(muted) {
       this.muted = !!muted;
+      this.emit('sound:state', { unlocked: this.unlocked, muted: this.muted });
       if (!this.initialized) return;
       const now = windowObj.Tone.now();
       const targets = this.sceneGainTargets(this.currentScene);
